@@ -152,7 +152,7 @@ pub fn get_process_by_pid(pid: u32) -> Option<ProcessMetrics> {
     let pid_obj = sysinfo::Pid::from(pid as usize);
     if sys.refresh_process(pid_obj) {
         sys.process(pid_obj).map(|process| ProcessMetrics {
-            pid: pid as u32,
+            pid,
             name: process.name().to_string(),
             cpu_usage: process.cpu_usage(),
             memory_bytes: process.memory(),
@@ -196,7 +196,7 @@ pub fn get_network_io() -> NetworkIoMetrics {
     let mut rx_p = 0;
     let mut tx_p = 0;
 
-    for data in networks.iter().map(|(_, d)| d) {
+    for data in networks.values() {
         rx += data.received();
         tx += data.transmitted();
         rx_p += data.packets_received();
@@ -291,7 +291,10 @@ mod tests {
     #[test]
     fn test_disk_io() {
         let io = get_disk_io();
-        println!("Global Disk I/O - Read: {} bytes, Written: {} bytes", io.read_bytes, io.written_bytes);
+        println!(
+            "Global Disk I/O - Read: {} bytes, Written: {} bytes",
+            io.read_bytes, io.written_bytes
+        );
     }
 
     #[test]
@@ -300,7 +303,10 @@ mod tests {
         let networks_mutex = get_networks_obj();
         let networks = networks_mutex.lock().unwrap();
         println!("Found {} interfaces", networks.len());
-        println!("Global Network I/O - RX: {} bytes, TX: {} bytes", io.rx_bytes, io.tx_bytes);
+        println!(
+            "Global Network I/O - RX: {} bytes, TX: {} bytes",
+            io.rx_bytes, io.tx_bytes
+        );
     }
 
     #[test]
@@ -308,10 +314,11 @@ mod tests {
         let batteries = get_batteries();
         println!("Found {} batteries", batteries.len());
         for b in batteries {
-            println!("Battery: {} {}, State: {}, Energy: {}%", 
-                b.vendor.unwrap_or_default(), 
-                b.model.unwrap_or_default(), 
-                b.state, 
+            println!(
+                "Battery: {} {}, State: {}, Energy: {}%",
+                b.vendor.unwrap_or_default(),
+                b.model.unwrap_or_default(),
+                b.state,
                 b.energy_pct
             );
         }

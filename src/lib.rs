@@ -11,12 +11,18 @@ fn to_c_string<T: Serialize>(data: &T) -> *mut c_char {
             Ok(c_str) => c_str.into_raw(),
             Err(e) => {
                 let err_json = format!(r#"{{"error": "CString conversion failed: {}"}}"#, e);
-                CString::new(err_json).unwrap_or_else(|_| CString::new(r#"{"error": "Fatal CString error"}"#).unwrap()).into_raw()
+                CString::new(err_json)
+                    .unwrap_or_else(|_| {
+                        CString::new(r#"{"error": "Fatal CString error"}"#).unwrap()
+                    })
+                    .into_raw()
             }
         },
         Err(e) => {
             let err_json = format!(r#"{{"error": "JSON serialization failed: {}"}}"#, e);
-            CString::new(err_json).unwrap_or_else(|_| CString::new(r#"{"error": "Fatal JSON error"}"#).unwrap()).into_raw()
+            CString::new(err_json)
+                .unwrap_or_else(|_| CString::new(r#"{"error": "Fatal JSON error"}"#).unwrap())
+                .into_raw()
         }
     }
 }
