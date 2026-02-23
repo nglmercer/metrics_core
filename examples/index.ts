@@ -49,7 +49,6 @@ try {
 }
 
 // --- UI Helpers ---
-// Use binary prefixes (KiB, MiB, GiB) to be precise and avoid confusion
 const formatBytes = (bytes: number) => {
   const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB'];
   let size = bytes;
@@ -75,77 +74,53 @@ const colors = {
 const clearScreen = () => process.stdout.write("\x1Bc");
 
 // --- Main Loop ---
-console.log(`${colors.bright}${colors.green}Starting METRICS Pro...${colors.reset}`);
-
-// Pre-refresh to get initial CPU readings
-lib.symbols.get_cpu_metrics();
+lib.symbols.get_cpu_metrics(); // Dummy call to init CPU history
 
 while (true) {
   clearScreen();
-  console.log(`${colors.bright}${colors.cyan}=== SYSTEM MONITOR PRO ===${colors.reset}`);
+  console.log(`${colors.bright}${colors.cyan}=== METRICS PRO (BUN FFI) ===${colors.reset}`);
   
   const uptimeSeconds = Number(lib.symbols.get_uptime());
-  const hours = Math.floor(uptimeSeconds / 3600);
-  const minutes = Math.floor((uptimeSeconds % 3600) / 60);
-  const seconds = uptimeSeconds % 60;
-  
-  console.log(`${colors.yellow}Uptime: ${hours}h ${minutes}m ${seconds}s${colors.reset}\n`);
+  const h = Math.floor(uptimeSeconds / 3600);
+  const m = Math.floor((uptimeSeconds % 3600) / 60);
+  const s = uptimeSeconds % 60;
+  console.log(`${colors.yellow}Uptime: ${h}h ${m}m ${s}s${colors.reset}\n`);
 
   // CPU
   const cpuPtr = lib.symbols.get_cpu_metrics();
   if (cpuPtr) {
-    const jsonStr = new CString(cpuPtr).toString();
-    const cpus = JSON.parse(jsonStr) as CpuMetrics[];
+    const cpus = JSON.parse(new CString(cpuPtr).toString()) as CpuMetrics[];
     lib.symbols.free_metrics_string(cpuPtr);
-    
-    console.log(`${colors.bright}CPU Statistics:${colors.reset}`);
-    const avgUsage = cpus.reduce((acc, cpu) => acc + cpu.usage_pct, 0) / cpus.length;
-    const barWidth = 30;
-    const filled = Math.round((avgUsage / 100) * barWidth);
-    const bar = "█".repeat(filled) + "░".repeat(barWidth - filled);
-    
-    console.log(`  Usage: [${colors.green}${bar}${colors.reset}] ${avgUsage.toFixed(1)}%`);
-    console.log(`  Model: ${colors.dim}${cpus[0]?.brand || 'Unknown'}${colors.reset}`);
-    console.log(`  Cores: ${cpus.length} @ ${cpus[0]?.frequency || 0}MHz\n`);
+    const avg = cpus.reduce((acc, c) => acc + c.usage_pct, 0) / cpus.length;
+    const bar = "█".repeat(Math.round(avg / 4)) + "░".repeat(25 - Math.round(avg / 4));
+    console.log(`${colors.bright}CPU usage:${colors.reset} [${colors.green}${bar}${colors.reset}] ${avg.toFixed(1)}%`);
+    console.log(`${colors.dim}  ${cpus[0]?.brand || 'N/A'} (${cpus.length} cores)${colors.reset}\n`);
   }
 
-  // Memory
+  // RAM
   const memPtr = lib.symbols.get_memory_metrics();
   if (memPtr) {
     const mem = JSON.parse(new CString(memPtr).toString()) as MemoryMetrics;
     lib.symbols.free_metrics_string(memPtr);
-
-    const usedPct = (mem.used_bytes / mem.total_bytes) * 100;
-    const barWidth = 30;
-    const filled = Math.round((usedPct / 100) * barWidth);
-    const bar = "█".repeat(filled) + "░".repeat(barWidth - filled);
-
-    console.log(`${colors.bright}Memory Usage:${colors.reset}`);
-    console.log(`  RAM:   [${colors.yellow}${bar}${colors.reset}] ${usedPct.toFixed(1)}%`);
-    console.log(`  Total: ${formatBytes(mem.total_bytes)}`);
-    console.log(`  Used:  ${formatBytes(mem.used_bytes)}`);
-    console.log(`  Avail: ${formatBytes(mem.available_bytes)}\n`);
+    const pct = (mem.used_bytes / mem.total_bytes) * 100;
+    const bar = "█".repeat(Math.round(pct / 4)) + "░".repeat(25 - Math.round(pct / 4));
+    console.log(`${colors.bright}RAM usage:${colors.reset} [${colors.yellow}${bar}${colors.reset}] ${pct.toFixed(1)}%`);
+    console.log(`  ${formatBytes(mem.used_bytes)} / ${formatBytes(mem.total_bytes)}\n`);
   }
 
-  // Storage
+  // Storage (Deduplicated)
   const diskPtr = lib.symbols.get_disk_metrics();
   if (diskPtr) {
     const disks = JSON.parse(new CString(diskPtr).toString()) as DiskMetrics[];
     lib.symbols.free_metrics_string(diskPtr);
-
-    console.log(`${colors.bright}Storage Devices:${colors.reset}`);
-    // Deduplicate mount points to avoid clutter
-    const seenMounts = new Set();
-    for (const disk of disks) {
-      if (disk.total_space === 0 || seenMounts.has(disk.mount_point)) continue;
-      seenMounts.add(disk.mount_point);
-      
-      const usage = ((disk.total_space - disk.available_space) / disk.total_space) * 100;
-      const barWidth = 15;
-      const filled = Math.round((usage / 100) * barWidth);
-      const bar = "█".repeat(filled) + "░".repeat(barWidth - filled);
-      
-      console.log(`  ${disk.mount_point.padEnd(10)} [${colors.cyan}${bar}${colors.reset}] ${usage.toFixed(1)}% of ${formatBytes(disk.total_space)}`);
+    console.log(`${colors.bright}Storage:${colors.reset}`);
+    const seen = new Set();
+    for (const d of disks) {
+      const id = `${d.name}_${d.total_space}`;
+      if (d.total_space === 0 || seen.has(id)) continue;
+      seen.add(id);
+      const used = ((d.total_space - d.available_space) / d.total_space) * 100;
+      console.log(`  ${d.mount_point.padEnd(12)} ${used.toFixed(1)}% of ${formatBytes(d.total_space)}`);
     }
     console.log("");
   }
@@ -153,16 +128,15 @@ while (true) {
   // Network
   const netPtr = lib.symbols.get_network_metrics();
   if (netPtr) {
-    const networks = JSON.parse(new CString(netPtr).toString()) as NetworkMetrics[];
+    const nets = JSON.parse(new CString(netPtr).toString()) as NetworkMetrics[];
     lib.symbols.free_metrics_string(netPtr);
-
     console.log(`${colors.bright}Network Traffic:${colors.reset}`);
-    for (const net of networks) {
-      if (net.received_bytes === 0 && net.transmitted_bytes === 0) continue;
-      console.log(`  ${colors.magenta}${net.interface.padEnd(12)}${colors.reset} ↓ ${formatBytes(net.received_bytes).padEnd(12)} ↑ ${formatBytes(net.transmitted_bytes)}`);
+    for (const n of nets) {
+      if (n.received_bytes === 0 && n.transmitted_bytes === 0) continue;
+      console.log(`  ${colors.magenta}${n.interface.padEnd(10)}${colors.reset} ↓ ${formatBytes(n.received_bytes).padEnd(10)} ↑ ${formatBytes(n.transmitted_bytes)}`);
     }
   }
 
-  console.log(`\n${colors.dim}Refreshing every 2s... (Press CTRL+C to exit)${colors.reset}`);
-  await new Promise(resolve => setTimeout(resolve, 2000));
+  console.log(`\n${colors.dim}Refreshing in 2s...${colors.reset}`);
+  await new Promise(r => setTimeout(r, 2000));
 }
