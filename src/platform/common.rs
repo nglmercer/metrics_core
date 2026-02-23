@@ -1,5 +1,6 @@
-    ComponentMetrics, CpuMetrics, DiskMetrics, MemoryMetrics, NetworkMetrics, OsInfo,
-    ProcessMetrics,
+use crate::types::{
+    BatteryInfo, ComponentMetrics, CpuMetrics, DiskIoMetrics, DiskMetrics, MemoryMetrics,
+    NetworkIoMetrics, NetworkMetrics, OsInfo, ProcessMetrics,
 };
 use std::sync::Mutex;
 use std::sync::OnceLock;
@@ -108,6 +109,20 @@ pub fn get_os_info() -> OsInfo {
     }
 }
 
+pub fn get_components() -> Vec<ComponentMetrics> {
+    let components_mutex = get_components_obj();
+    let mut components = components_mutex.lock().unwrap();
+    components.refresh_list();
+    components.refresh();
+
+    components
+        .iter()
+        .map(|c| ComponentMetrics {
+            label: c.label().to_string(),
+            temperature: c.temperature(),
+            max: c.max(),
+            critical: c.critical(),
+        })
         .collect()
 }
 
@@ -151,6 +166,80 @@ pub fn get_process_by_pid(pid: u32) -> Option<ProcessMetrics> {
     }
 }
 
+pub fn get_disk_io() -> DiskIoMetrics {
+    let sys_mutex = get_system();
+    let mut sys = sys_mutex.lock().unwrap();
+    sys.refresh_processes();
+
+    let mut read = 0;
+    let mut written = 0;
+
+    for process in sys.processes().values() {
+        let usage = process.disk_usage();
+        read += usage.read_bytes;
+        written += usage.written_bytes;
+    }
+
+    DiskIoMetrics {
+        read_bytes: read,
+        written_bytes: written,
+    }
+}
+
+pub fn get_network_io() -> NetworkIoMetrics {
+    let networks_mutex = get_networks_obj();
+    let mut networks = networks_mutex.lock().unwrap();
+    networks.refresh();
+
+    let mut rx = 0;
+    let mut tx = 0;
+    let mut rx_p = 0;
+    let mut tx_p = 0;
+
+    for data in networks.iter().map(|(_, d)| d) {
+        rx += data.received();
+        tx += data.transmitted();
+        rx_p += data.packets_received();
+        tx_p += data.packets_transmitted();
+    }
+
+    NetworkIoMetrics {
+        rx_bytes: rx,
+        tx_bytes: tx,
+        rx_packets: rx_p,
+        tx_packets: tx_p,
+    }
+}
+
+pub fn get_batteries() -> Vec<BatteryInfo> {
+    let mut results = Vec::new();
+    let manager = match starship_battery::Manager::new() {
+        Ok(m) => m,
+        Err(_) => return Vec::new(),
+    };
+
+    let batteries = match manager.batteries() {
+        Ok(b) => b,
+        Err(_) => return Vec::new(),
+    };
+
+    for battery in batteries.flatten() {
+        results.push(BatteryInfo {
+            state: format!("{:?}", battery.state()),
+            vendor: battery.vendor().map(|s| s.to_string()),
+            model: battery.model().map(|s| s.to_string()),
+            cycle_count: battery.cycle_count(),
+            health_pct: battery.state_of_health().value * 100.0,
+            energy_pct: battery.state_of_charge().value * 100.0,
+            energy_full_design_wh: battery.energy_full_design().value,
+            energy_full_wh: battery.energy_full().value,
+            energy_wh: battery.energy().value,
+        });
+    }
+
+    results
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -182,6 +271,49 @@ mod tests {
         println!("Found {} processes", processes.len());
         if let Some(p) = processes.first() {
             println!("First process: {} (PID: {})", p.name, p.pid);
+        }
+    }
+
+    #[test]
+    fn test_get_process_by_pid() {
+        let processes = get_processes();
+        if let Some(first) = processes.first() {
+            let pid = first.pid;
+            let p_info = get_process_by_pid(pid);
+            assert!(p_info.is_some());
+            let p = p_info.unwrap();
+            assert_eq!(p.pid, pid);
+            println!("Verified process info for PID {}: {}", pid, p.name);
+            println!("  CPU: {}%, MEM: {} bytes", p.cpu_usage, p.memory_bytes);
+        }
+    }
+
+    #[test]
+    fn test_disk_io() {
+        let io = get_disk_io();
+        println!("Global Disk I/O - Read: {} bytes, Written: {} bytes", io.read_bytes, io.written_bytes);
+    }
+
+    #[test]
+    fn test_network_io() {
+        let io = get_network_io();
+        let networks_mutex = get_networks_obj();
+        let networks = networks_mutex.lock().unwrap();
+        println!("Found {} interfaces", networks.len());
+        println!("Global Network I/O - RX: {} bytes, TX: {} bytes", io.rx_bytes, io.tx_bytes);
+    }
+
+    #[test]
+    fn test_batteries() {
+        let batteries = get_batteries();
+        println!("Found {} batteries", batteries.len());
+        for b in batteries {
+            println!("Battery: {} {}, State: {}, Energy: {}%", 
+                b.vendor.unwrap_or_default(), 
+                b.model.unwrap_or_default(), 
+                b.state, 
+                b.energy_pct
+            );
         }
     }
 }

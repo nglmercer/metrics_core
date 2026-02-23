@@ -9,9 +9,15 @@ fn to_c_string<T: Serialize>(data: &T) -> *mut c_char {
     match serde_json::to_string(data) {
         Ok(json) => match CString::new(json) {
             Ok(c_str) => c_str.into_raw(),
-            Err(_) => std::ptr::null_mut(),
+            Err(e) => {
+                let err_json = format!(r#"{{"error": "CString conversion failed: {}"}}"#, e);
+                CString::new(err_json).unwrap_or_else(|_| CString::new(r#"{"error": "Fatal CString error"}"#).unwrap()).into_raw()
+            }
         },
-        Err(_) => std::ptr::null_mut(),
+        Err(e) => {
+            let err_json = format!(r#"{{"error": "JSON serialization failed: {}"}}"#, e);
+            CString::new(err_json).unwrap_or_else(|_| CString::new(r#"{"error": "Fatal JSON error"}"#).unwrap()).into_raw()
+        }
     }
 }
 
@@ -55,6 +61,40 @@ pub extern "C" fn get_os_info() -> *mut c_char {
 #[no_mangle]
 pub extern "C" fn get_cpu_components() -> *mut c_char {
     to_c_string(&platform::get_components())
+}
+
+/// Returns a JSON string containing the process list.
+#[no_mangle]
+pub extern "C" fn get_processes() -> *mut c_char {
+    to_c_string(&platform::get_processes())
+}
+
+/// Returns a JSON string containing information for a specific PID.
+/// Returns null if not found.
+#[no_mangle]
+pub extern "C" fn get_process_by_pid(pid: u32) -> *mut c_char {
+    match platform::get_process_by_pid(pid) {
+        Some(p) => to_c_string(&p),
+        None => std::ptr::null_mut(),
+    }
+}
+
+/// Returns a JSON string containing global Disk I/O metrics.
+#[no_mangle]
+pub extern "C" fn get_disk_io() -> *mut c_char {
+    to_c_string(&platform::get_disk_io())
+}
+
+/// Returns a JSON string containing global Network I/O metrics.
+#[no_mangle]
+pub extern "C" fn get_network_io() -> *mut c_char {
+    to_c_string(&platform::get_network_io())
+}
+
+/// Returns a JSON string containing Battery information.
+#[no_mangle]
+pub extern "C" fn get_battery_info() -> *mut c_char {
+    to_c_string(&platform::get_batteries())
 }
 
 /// Frees a string allocated by any of the metrics functions.

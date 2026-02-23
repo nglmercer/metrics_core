@@ -63,3 +63,30 @@ pub struct ProcessMetrics {
     pub status: String,
     pub user_id: Option<String>,
 }
+
+#[derive(Serialize)]
+pub struct DiskIoMetrics {
+    pub read_bytes: u64,
+    pub written_bytes: u64,
+}
+
+#[derive(Serialize)]
+pub struct NetworkIoMetrics {
+    pub rx_bytes: u64,
+    pub tx_bytes: u64,
+    pub rx_packets: u64,
+    pub tx_packets: u64,
+}
+
+#[derive(Serialize)]
+pub struct BatteryInfo {
+    pub state: String,
+    pub vendor: Option<String>,
+    pub model: Option<String>,
+    pub cycle_count: Option<u32>,
+    pub health_pct: f32,
+    pub energy_pct: f32,
+    pub energy_full_design_wh: f32,
+    pub energy_full_wh: f32,
+    pub energy_wh: f32,
+}
