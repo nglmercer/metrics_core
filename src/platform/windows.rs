@@ -1,7 +1,7 @@
 use crate::types::{CpuMetrics, DiskMetrics, MemoryMetrics, NetworkMetrics};
-use sysinfo::{Disks, Networks, System, CpuRefreshKind, MemoryRefreshKind};
 use std::sync::Mutex;
 use std::sync::OnceLock;
+use sysinfo::{CpuRefreshKind, Disks, MemoryRefreshKind, Networks, System};
 
 static SYSTEM: OnceLock<Mutex<System>> = OnceLock::new();
 static DISKS: OnceLock<Mutex<Disks>> = OnceLock::new();
@@ -27,7 +27,7 @@ pub fn get_cpus() -> Vec<CpuMetrics> {
     let sys_mutex = get_system();
     let mut sys = sys_mutex.lock().unwrap();
     sys.refresh_cpu_specifics(CpuRefreshKind::new().with_cpu_usage());
-    
+
     sys.cpus()
         .iter()
         .map(|cpu| CpuMetrics {
@@ -42,7 +42,7 @@ pub fn get_memory() -> MemoryMetrics {
     let sys_mutex = get_system();
     let mut sys = sys_mutex.lock().unwrap();
     sys.refresh_memory_specifics(MemoryRefreshKind::new().with_ram());
-    
+
     MemoryMetrics {
         total_bytes: sys.total_memory(),
         free_bytes: sys.free_memory(),
@@ -55,7 +55,7 @@ pub fn get_disks() -> Vec<DiskMetrics> {
     let disks_mutex = get_disks_obj();
     let mut disks = disks_mutex.lock().unwrap();
     disks.refresh_list();
-    
+
     disks
         .iter()
         .map(|disk| DiskMetrics {
@@ -71,7 +71,7 @@ pub fn get_networks() -> Vec<NetworkMetrics> {
     let networks_mutex = get_networks_obj();
     let mut networks = networks_mutex.lock().unwrap();
     networks.refresh();
-    
+
     networks
         .iter()
         .map(|(name, data)| NetworkMetrics {
