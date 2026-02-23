@@ -1,6 +1,13 @@
 use serde::Serialize;
 
 #[derive(Serialize)]
+pub struct LoadAverage {
+    pub one_min: f64,
+    pub five_min: f64,
+    pub fifteen_min: f64,
+}
+
+#[derive(Serialize)]
 pub struct CpuMetrics {
     pub usage_pct: f32,
     pub brand: String,
@@ -89,4 +96,15 @@ pub struct BatteryInfo {
     pub energy_full_design_wh: f32,
     pub energy_full_wh: f32,
     pub energy_wh: f32,
+}
+
+#[derive(Serialize)]
+pub struct AllMetrics {
+    pub cpu: Vec<CpuMetrics>,
+    pub memory: MemoryMetrics,
+    pub disks: Vec<DiskMetrics>,
+    pub networks: Vec<NetworkMetrics>,
+    pub uptime: u64,
+    pub os_info: OsInfo,
+    pub load_avg: LoadAverage,
 }

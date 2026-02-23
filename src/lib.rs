@@ -57,6 +57,12 @@ pub extern "C" fn get_uptime() -> u64 {
     platform::get_uptime()
 }
 
+/// Returns a JSON string containing system load averages.
+#[no_mangle]
+pub extern "C" fn get_load_average() -> *mut c_char {
+    to_c_string(&platform::get_load_average())
+}
+
 /// Returns a JSON string containing OS information.
 #[no_mangle]
 pub extern "C" fn get_os_info() -> *mut c_char {
@@ -101,6 +107,19 @@ pub extern "C" fn get_network_io() -> *mut c_char {
 #[no_mangle]
 pub extern "C" fn get_battery_info() -> *mut c_char {
     to_c_string(&platform::get_batteries())
+}
+
+/// Returns a JSON string containing all system metrics at once.
+#[no_mangle]
+pub extern "C" fn get_all_metrics() -> *mut c_char {
+    to_c_string(&platform::get_all_metrics())
+}
+
+/// Cleans up internal resources.
+/// Note: Currently a placeholder as OnceLock cannot be cleared in stable Rust.
+#[no_mangle]
+pub extern "C" fn cleanup_metrics() {
+    platform::cleanup_metrics()
 }
 
 /// Frees a string allocated by any of the metrics functions.

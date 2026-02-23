@@ -21,17 +21,13 @@ except OSError:
     sys.exit(1)
 
 # Define return types for FFI functions
-lib.get_cpu_metrics.restype = ctypes.c_char_p
-lib.get_memory_metrics.restype = ctypes.c_char_p
-lib.get_disk_metrics.restype = ctypes.c_char_p
-lib.get_network_metrics.restype = ctypes.c_char_p
-lib.get_os_info.restype = ctypes.c_char_p
-lib.get_cpu_components.restype = ctypes.c_char_p
-lib.get_uptime.restype = ctypes.c_uint64
+lib.get_all_metrics.restype = ctypes.c_char_p
+lib.get_battery_info.restype = ctypes.c_char_p
+lib.get_library_version.restype = ctypes.c_char_p
+lib.free_metrics_string.argtypes = [ctypes.c_char_p]
 
 # --- UI Helpers ---
 def format_bytes(b):
-    """Formats bytes into human-readable binary prefixes (KiB, GiB, etc.)"""
     for unit in ['B', 'KiB', 'MiB', 'GiB', 'TiB']:
         if b < 1024:
             return f"{b:.2f} {unit}"
@@ -39,7 +35,6 @@ def format_bytes(b):
     return f"{b:.2f} PiB"
 
 def clear():
-    """Clears the terminal screen"""
     os.system('cls' if os.name == 'nt' else 'clear')
 
 class Colors:
@@ -54,92 +49,85 @@ class Colors:
 
 # --- Main Application Loop ---
 try:
-    # Initial call to initialize CPU history in the Rust library
-    lib.get_cpu_metrics()
-    
+    version_raw = lib.get_library_version()
+    version = json.loads(version_raw.decode())['version']
+    lib.free_metrics_string(version_raw)
+
     while True:
         clear()
-        print(f"{Colors.CYAN}=== SYSTEM MONITOR PRO (PYTHON FFI) ==={Colors.RESET}")
+        print(f"{Colors.CYAN}=== SYSTEM MONITOR PRO v{version} (PYTHON FFI) ==={Colors.RESET}")
         
-        uptime = lib.get_uptime()
+        raw_ptr = lib.get_all_metrics()
+        if not raw_ptr:
+            print("Error: Could not fetch metrics")
+            time.sleep(2)
+            continue
+            
+        data = json.loads(raw_ptr.decode())
+        lib.free_metrics_string(raw_ptr)
+
+        uptime = data['uptime']
         hours, rem = divmod(uptime, 3600)
         minutes, seconds = divmod(rem, 60)
         
-        # OS info
-        os_raw = lib.get_os_info()
-        if os_raw:
-            os_data = json.loads(os_raw.decode())
-            print(f"{Colors.DIM}{os_data['name']} {os_data['os_version']} | {os_data['host_name']} ({os_data['kernel_version']}){Colors.RESET}")
-
-        print(f"{Colors.YELLOW}System Uptime: {hours}h {minutes}m {seconds}s{Colors.RESET}\n")
+        # OS & Load
+        os_info = data['os_info']
+        load = data['load_avg']
+        print(f"{Colors.DIM}{os_info['name']} {os_info['os_version']} | {os_info['host_name']}{Colors.RESET}")
+        print(f"{Colors.YELLOW}Uptime: {hours}h {minutes}m {seconds}s | Load: {load['one_min']:.2f} {load['five_min']:.2f} {load['fifteen_min']:.2f}{Colors.RESET}\n")
 
         # CPU Statistics
-        cpu_raw = lib.get_cpu_metrics()
-        if cpu_raw:
-            cpu_data = json.loads(cpu_raw.decode())
-            avg_cpu = sum(c['usage_pct'] for c in cpu_data) / len(cpu_data)
-            bar_width = 30
-            filled = int((avg_cpu / 100) * bar_width)
-            bar = "█" * filled + "░" * (bar_width - filled)
-            print(f"{Colors.BOLD}CPU Usage:{Colors.RESET} [{Colors.GREEN}{bar}{Colors.RESET}] {avg_cpu:.1f}%")
-            
-            # CPU Temperature
-            sensors_raw = lib.get_cpu_components()
-            if sensors_raw:
-                sensors = json.loads(sensors_raw.decode())
-                # Define common CPU-related temperature labels
-                cpu_labels = ["cpu", "package", "k10temp", "coretemp", "tctl", "tdie"]
-                temps = [s for s in sensors if any(label in s['label'].lower() for label in cpu_labels)]
-                if temps:
-                    temp_str = ", ".join([f"{t['temperature']}°C" for t in temps])
-                    print(f"{Colors.DIM}  Temp: {temp_str}{Colors.RESET}")
-            
-            print(f"{Colors.DIM}  {cpu_data[0]['brand']} ({len(cpu_data)} cores @ {cpu_data[0]['frequency']}MHz){Colors.RESET}\n")
+        cpus = data['cpu']
+        avg_cpu = sum(c['usage_pct'] for c in cpus) / len(cpus)
+        bar_width = 30
+        filled = int((avg_cpu / 100) * bar_width)
+        bar = "█" * filled + "░" * (bar_width - filled)
+        print(f"{Colors.BOLD}CPU Usage:{Colors.RESET} [{Colors.GREEN}{bar}{Colors.RESET}] {avg_cpu:.1f}%")
+        print(f"{Colors.DIM}  {cpus[0]['brand']} ({len(cpus)} cores @ {cpus[0]['frequency']}MHz){Colors.RESET}\n")
 
         # Memory Usage
-        mem_raw = lib.get_memory_metrics()
-        if mem_raw:
-            mem = json.loads(mem_raw.decode())
-            used_pct = (mem['used_bytes'] / mem['total_bytes']) * 100
-            bar_width = 30
-            filled = int((used_pct / 100) * bar_width)
-            bar = "█" * filled + "░" * (bar_width - filled)
-            print(f"{Colors.BOLD}RAM Usage:{Colors.RESET} [{Colors.YELLOW}{bar}{Colors.RESET}] {used_pct:.1f}%")
-            print(f"  {format_bytes(mem['used_bytes'])} / {format_bytes(mem['total_bytes'])}\n")
+        mem = data['memory']
+        used_pct = (mem['used_bytes'] / mem['total_bytes']) * 100
+        filled = int((used_pct / 100) * bar_width)
+        bar = "█" * filled + "░" * (bar_width - filled)
+        print(f"{Colors.BOLD}RAM Usage:{Colors.RESET} [{Colors.YELLOW}{bar}{Colors.RESET}] {used_pct:.1f}%")
+        print(f"  {format_bytes(mem['used_bytes'])} / {format_bytes(mem['total_bytes'])}\n")
 
-        # Storage Devices (Deduplicated)
-        disk_raw = lib.get_disk_metrics()
-        if disk_raw:
-            print(f"{Colors.BOLD}Storage Devices:{Colors.RESET}")
-            disks = json.loads(disk_raw.decode())
-            seen_disks = set()
-            for d in disks:
-                # Deduplicate by disk name and size to handle subvolumes/mounts
-                disk_id = f"{d['name']}_{d['total_space']}"
-                if d['total_space'] == 0 or disk_id in seen_disks:
-                    continue
-                seen_disks.add(disk_id)
-                usage_pct = ((d['total_space'] - d['available_space']) / d['total_space']) * 100
-                print(f"  {d['mount_point']:<12} {usage_pct:>5.1f}% used of {format_bytes(d['total_space'])}")
-            print()
+        # Battery
+        bat_raw = lib.get_battery_info()
+        if bat_raw:
+            batteries = json.loads(bat_raw.decode())
+            lib.free_metrics_string(bat_raw)
+            if batteries:
+                print(f"{Colors.BOLD}Battery Status:{Colors.RESET}")
+                for b in batteries:
+                    print(f"  {b['state']}: {b['energy_pct']:.1f}% (Health: {b['health_pct']:.1f}%)")
+                print()
+
+        # Storage
+        print(f"{Colors.BOLD}Storage Devices:{Colors.RESET}")
+        seen_disks = set()
+        for d in data['disks']:
+            disk_id = f"{d['name']}_{d['total_space']}"
+            if d['total_space'] == 0 or disk_id in seen_disks:
+                continue
+            seen_disks.add(disk_id)
+            usage_pct = ((d['total_space'] - d['available_space']) / d['total_space']) * 100
+            print(f"  {d['mount_point']:<12} {usage_pct:>5.1f}% used of {format_bytes(d['total_space'])} ({d['file_system']})")
+        print()
 
         # Network Traffic
-        net_raw = lib.get_network_metrics()
-        if net_raw:
-            print(f"{Colors.BOLD}Network Traffic:{Colors.RESET}")
-            networks = json.loads(net_raw.decode())
-            for n in networks:
-                if n['received_bytes'] == 0 and n['transmitted_bytes'] == 0:
-                    continue
-                print(f"  {Colors.MAGENTA}{n['interface']:<10}{Colors.RESET} "
-                      f"RX: {format_bytes(n['received_bytes']):<10} "
-                      f"TX: {format_bytes(n['transmitted_bytes'])}")
+        print(f"{Colors.BOLD}Network Traffic:{Colors.RESET}")
+        for n in data['networks']:
+            if n['received_bytes'] == 0 and n['transmitted_bytes'] == 0:
+                continue
+            print(f"  {Colors.MAGENTA}{n['interface']:<10}{Colors.RESET} ↓ {format_bytes(n['received_bytes']):<10} ↑ {format_bytes(n['transmitted_bytes'])}")
 
-        print(f"\n{Colors.DIM}Refreshing every 2s... (Press Ctrl+C to exit){Colors.RESET}")
+        print(f"\n{Colors.DIM}Refreshing... (Ctrl+C to exit){Colors.RESET}")
         time.sleep(2)
         
 except KeyboardInterrupt:
-    print(f"\n{Colors.YELLOW}Exiting Monitor...{Colors.RESET}")
+    print(f"\n{Colors.YELLOW}Exiting...{Colors.RESET}")
     sys.exit(0)
 except Exception as e:
     print(f"\n{Colors.RED}Runtime Error: {e}{Colors.RESET}")

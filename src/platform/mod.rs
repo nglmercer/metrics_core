@@ -85,3 +85,28 @@ pub fn get_network_io() -> NetworkIoMetrics {
 pub fn get_batteries() -> Vec<BatteryInfo> {
     Vec::new()
 }
+
+#[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
+pub fn get_load_average() -> LoadAverage {
+    LoadAverage {
+        one_min: 0.0,
+        five_min: 0.0,
+        fifteen_min: 0.0,
+    }
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
+pub fn get_all_metrics() -> AllMetrics {
+    AllMetrics {
+        cpu: Vec::new(),
+        memory: get_memory(),
+        disks: Vec::new(),
+        networks: Vec::new(),
+        uptime: 0,
+        os_info: get_os_info(),
+        load_avg: get_load_average(),
+    }
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
+pub fn cleanup_metrics() {}
