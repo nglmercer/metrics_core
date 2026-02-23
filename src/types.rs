@@ -51,3 +51,15 @@ pub struct ComponentMetrics {
     pub max: f32,
     pub critical: Option<f32>,
 }
+
+#[derive(Serialize)]
+pub struct ProcessMetrics {
+    pub pid: u32,
+    pub name: String,
+    pub cpu_usage: f32,
+    pub memory_bytes: u64,
+    pub disk_read_bytes: u64,
+    pub disk_written_bytes: u64,
+    pub status: String,
+    pub user_id: Option<String>,
+}

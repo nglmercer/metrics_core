@@ -45,6 +45,18 @@ pub extern "C" fn get_uptime() -> u64 {
     platform::get_uptime()
 }
 
+/// Returns a JSON string containing OS information.
+#[no_mangle]
+pub extern "C" fn get_os_info() -> *mut c_char {
+    to_c_string(&platform::get_os_info())
+}
+
+/// Returns a JSON string containing CPU components (temperature sensors).
+#[no_mangle]
+pub extern "C" fn get_cpu_components() -> *mut c_char {
+    to_c_string(&platform::get_components())
+}
+
 /// Frees a string allocated by any of the metrics functions.
 ///
 /// # Safety

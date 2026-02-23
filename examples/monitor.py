@@ -25,6 +25,8 @@ lib.get_cpu_metrics.restype = ctypes.c_char_p
 lib.get_memory_metrics.restype = ctypes.c_char_p
 lib.get_disk_metrics.restype = ctypes.c_char_p
 lib.get_network_metrics.restype = ctypes.c_char_p
+lib.get_os_info.restype = ctypes.c_char_p
+lib.get_cpu_components.restype = ctypes.c_char_p
 lib.get_uptime.restype = ctypes.c_uint64
 
 # --- UI Helpers ---
@@ -62,6 +64,13 @@ try:
         uptime = lib.get_uptime()
         hours, rem = divmod(uptime, 3600)
         minutes, seconds = divmod(rem, 60)
+        
+        # OS info
+        os_raw = lib.get_os_info()
+        if os_raw:
+            os_data = json.loads(os_raw.decode())
+            print(f"{Colors.DIM}{os_data['name']} {os_data['os_version']} | {os_data['host_name']} ({os_data['kernel_version']}){Colors.RESET}")
+
         print(f"{Colors.YELLOW}System Uptime: {hours}h {minutes}m {seconds}s{Colors.RESET}\n")
 
         # CPU Statistics
@@ -73,6 +82,18 @@ try:
             filled = int((avg_cpu / 100) * bar_width)
             bar = "█" * filled + "░" * (bar_width - filled)
             print(f"{Colors.BOLD}CPU Usage:{Colors.RESET} [{Colors.GREEN}{bar}{Colors.RESET}] {avg_cpu:.1f}%")
+            
+            # CPU Temperature
+            sensors_raw = lib.get_cpu_components()
+            if sensors_raw:
+                sensors = json.loads(sensors_raw.decode())
+                # Define common CPU-related temperature labels
+                cpu_labels = ["cpu", "package", "k10temp", "coretemp", "tctl", "tdie"]
+                temps = [s for s in sensors if any(label in s['label'].lower() for label in cpu_labels)]
+                if temps:
+                    temp_str = ", ".join([f"{t['temperature']}°C" for t in temps])
+                    print(f"{Colors.DIM}  Temp: {temp_str}{Colors.RESET}")
+            
             print(f"{Colors.DIM}  {cpu_data[0]['brand']} ({len(cpu_data)} cores @ {cpu_data[0]['frequency']}MHz){Colors.RESET}\n")
 
         # Memory Usage

@@ -4,6 +4,9 @@ mod common;
 pub use common::*;
 
 #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
+use crate::types::*;
+
+#[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
 pub fn get_cpus() -> Vec<CpuMetrics> {
     Vec::new()
 }
@@ -33,4 +36,19 @@ pub fn get_networks() -> Vec<NetworkMetrics> {
 #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
 pub fn get_uptime() -> u64 {
     0
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
+pub fn get_os_info() -> OsInfo {
+    OsInfo {
+        name: String::new(),
+        kernel_version: String::new(),
+        os_version: String::new(),
+        host_name: String::new(),
+    }
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
+pub fn get_components() -> Vec<ComponentMetrics> {
+    Vec::new()
 }

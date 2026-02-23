@@ -27,6 +27,20 @@ interface NetworkMetrics {
   transmitted_bytes: number;
 }
 
+interface OsInfo {
+  name: string;
+  kernel_version: string;
+  os_version: string;
+  host_name: string;
+}
+
+interface ComponentMetrics {
+  label: string;
+  temperature: number;
+  max: number;
+  critical: number | null;
+}
+
 // --- Library Loading ---
 const libPath = `./target/release/libmetrics.${
   process.platform === "win32" ? "dll" : process.platform === "darwin" ? "dylib" : "so"
@@ -40,6 +54,8 @@ try {
     get_network_metrics: { returns: FFIType.ptr, args: [] },
     get_disk_metrics: { returns: FFIType.ptr, args: [] },
     get_uptime: { returns: FFIType.u64, args: [] },
+    get_os_info: { returns: FFIType.ptr, args: [] },
+    get_cpu_components: { returns: FFIType.ptr, args: [] },
     free_metrics_string: { returns: FFIType.void, args: [FFIType.ptr] },
   });
 } catch (e) {
@@ -84,6 +100,15 @@ while (true) {
   const h = Math.floor(uptimeSeconds / 3600);
   const m = Math.floor((uptimeSeconds % 3600) / 60);
   const s = uptimeSeconds % 60;
+  
+  // OS Info
+  const osPtr = lib.symbols.get_os_info();
+  if (osPtr) {
+    const os = JSON.parse(new CString(osPtr).toString()) as OsInfo;
+    lib.symbols.free_metrics_string(osPtr);
+    console.log(`${colors.dim}${os.name} ${os.os_version} | ${os.host_name} (${os.kernel_version})${colors.reset}`);
+  }
+  
   console.log(`${colors.yellow}Uptime: ${h}h ${m}m ${s}s${colors.reset}\n`);
 
   // CPU
@@ -94,6 +119,25 @@ while (true) {
     const avg = cpus.reduce((acc, c) => acc + c.usage_pct, 0) / cpus.length;
     const bar = "█".repeat(Math.round(avg / 4)) + "░".repeat(25 - Math.round(avg / 4));
     console.log(`${colors.bright}CPU usage:${colors.reset} [${colors.green}${bar}${colors.reset}] ${avg.toFixed(1)}%`);
+    
+    // CPU Temp
+    const sensorsPtr = lib.symbols.get_cpu_components();
+    if (sensorsPtr) {
+      const sensors = JSON.parse(new CString(sensorsPtr).toString()) as ComponentMetrics[];
+      lib.symbols.free_metrics_string(sensorsPtr);
+      const temps = sensors.filter(s => {
+        const l = s.label.toLowerCase();
+        return l.includes("cpu") || l.includes("package") || l.includes("k10temp") || l.includes("coretemp") || l.includes("tctl") || l.includes("tdie");
+      });
+      if (temps.length > 0) {
+        process.stdout.write(`${colors.dim}  Temp: `);
+        temps.forEach((t, i) => {
+          process.stdout.write(`${t.temperature}°C${i < temps.length - 1 ? ', ' : ''}`);
+        });
+        process.stdout.write(`${colors.reset}\n`);
+      }
+    }
+    
     console.log(`${colors.dim}  ${cpus[0]?.brand || 'N/A'} (${cpus.length} cores)${colors.reset}\n`);
   }
 
