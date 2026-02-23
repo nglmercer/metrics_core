@@ -48,6 +48,8 @@ pub fn get_memory() -> MemoryMetrics {
         free_bytes: sys.free_memory(),
         used_bytes: sys.used_memory(),
         available_bytes: sys.available_memory(),
+        swap_total_bytes: sys.total_swap(),
+        swap_used_bytes: sys.used_swap(),
     }
 }
 
@@ -62,7 +64,9 @@ pub fn get_disks() -> Vec<DiskMetrics> {
             name: disk.name().to_string_lossy().into_owned(),
             total_space: disk.total_space(),
             available_space: disk.available_space(),
+            used_space: disk.total_space() - disk.available_space(),
             mount_point: disk.mount_point().to_string_lossy().into_owned(),
+            file_system: disk.file_system().to_string_lossy().into_owned(),
         })
         .collect()
 }
@@ -78,6 +82,8 @@ pub fn get_networks() -> Vec<NetworkMetrics> {
             interface: name.clone(),
             received_bytes: data.received(),
             transmitted_bytes: data.transmitted(),
+            packets_received: data.packets_received(),
+            packets_transmitted: data.packets_transmitted(),
         })
         .collect()
 }

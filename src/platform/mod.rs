@@ -1,100 +1,36 @@
-pub mod linux;
-pub mod macos;
-pub mod windows;
+mod common;
 
-use crate::types::*;
+#[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
+pub use common::*;
 
+#[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
 pub fn get_cpus() -> Vec<CpuMetrics> {
-    #[cfg(target_os = "linux")]
-    {
-        linux::get_cpus()
-    }
-    #[cfg(target_os = "windows")]
-    {
-        windows::get_cpus()
-    }
-    #[cfg(target_os = "macos")]
-    {
-        macos::get_cpus()
-    }
-    #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
-    {
-        panic!("Unsupported platform")
-    }
+    Vec::new()
 }
 
+#[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
 pub fn get_memory() -> MemoryMetrics {
-    #[cfg(target_os = "linux")]
-    {
-        linux::get_memory()
-    }
-    #[cfg(target_os = "windows")]
-    {
-        windows::get_memory()
-    }
-    #[cfg(target_os = "macos")]
-    {
-        macos::get_memory()
-    }
-    #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
-    {
-        panic!("Unsupported platform")
+    MemoryMetrics {
+        total_bytes: 0,
+        free_bytes: 0,
+        used_bytes: 0,
+        available_bytes: 0,
+        swap_total_bytes: 0,
+        swap_used_bytes: 0,
     }
 }
 
+#[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
 pub fn get_disks() -> Vec<DiskMetrics> {
-    #[cfg(target_os = "linux")]
-    {
-        linux::get_disks()
-    }
-    #[cfg(target_os = "windows")]
-    {
-        windows::get_disks()
-    }
-    #[cfg(target_os = "macos")]
-    {
-        macos::get_disks()
-    }
-    #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
-    {
-        panic!("Unsupported platform")
-    }
+    Vec::new()
 }
 
+#[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
 pub fn get_networks() -> Vec<NetworkMetrics> {
-    #[cfg(target_os = "linux")]
-    {
-        linux::get_networks()
-    }
-    #[cfg(target_os = "windows")]
-    {
-        windows::get_networks()
-    }
-    #[cfg(target_os = "macos")]
-    {
-        macos::get_networks()
-    }
-    #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
-    {
-        panic!("Unsupported platform")
-    }
+    Vec::new()
 }
 
+#[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
 pub fn get_uptime() -> u64 {
-    #[cfg(target_os = "linux")]
-    {
-        linux::get_uptime()
-    }
-    #[cfg(target_os = "windows")]
-    {
-        windows::get_uptime()
-    }
-    #[cfg(target_os = "macos")]
-    {
-        macos::get_uptime()
-    }
-    #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
-    {
-        panic!("Unsupported platform")
-    }
+    0
 }
