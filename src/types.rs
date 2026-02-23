@@ -9,10 +9,10 @@ pub struct CpuMetrics {
 
 #[derive(Serialize)]
 pub struct MemoryMetrics {
-    pub total_kb: u64,
-    pub free_kb: u64,
-    pub used_kb: u64,
-    pub available_kb: u64,
+    pub total_bytes: u64,
+    pub free_bytes: u64,
+    pub used_bytes: u64,
+    pub available_bytes: u64,
 }
 
 #[derive(Serialize)]

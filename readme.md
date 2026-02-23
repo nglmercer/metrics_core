@@ -218,18 +218,23 @@ func main() {
 ### Bun (FFI)
 
 ```typescript
-import { dlopen, FFIType, ptr } from "bun:ffi";
+import { dlopen, FFIType, CString } from "bun:ffi";
 
 const path = `libmetrics.${process.platform === "win32" ? "dll" : process.platform === "darwin" ? "dylib" : "so"}`;
 
 const lib = dlopen(path, {
-  get_cpu_metrics: { returns: FFIType.cstring, args: [] },
-  get_memory_metrics: { returns: FFIType.cstring, args: [] },
+  get_cpu_metrics: { returns: FFIType.ptr, args: [] },
   get_uptime: { returns: FFIType.u64, args: [] },
+  free_metrics_string: { returns: FFIType.void, args: [FFIType.ptr] },
 });
 
-console.log("CPU:", JSON.parse(lib.symbols.get_cpu_metrics()!));
-console.log("Memory:", JSON.parse(lib.symbols.get_memory_metrics()!));
+// Get CPU metrics
+const cpuPtr = lib.symbols.get_cpu_metrics();
+if (cpuPtr) {
+  console.log("CPU:", JSON.parse(new CString(cpuPtr)));
+  lib.symbols.free_metrics_string(cpuPtr);
+}
+
 console.log("Uptime:", lib.symbols.get_uptime(), "s");
 ```
 

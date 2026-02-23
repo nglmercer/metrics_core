@@ -1,9 +1,33 @@
 use crate::types::{CpuMetrics, DiskMetrics, MemoryMetrics, NetworkMetrics};
-use sysinfo::{Disks, Networks, System};
+use sysinfo::{Disks, Networks, System, CpuRefreshKind, MemoryRefreshKind};
+use std::sync::Mutex;
+use std::sync::OnceLock;
+
+static SYSTEM: OnceLock<Mutex<System>> = OnceLock::new();
+static DISKS: OnceLock<Mutex<Disks>> = OnceLock::new();
+static NETWORKS: OnceLock<Mutex<Networks>> = OnceLock::new();
+
+fn get_system() -> &'static Mutex<System> {
+    SYSTEM.get_or_init(|| {
+        let mut sys = System::new();
+        sys.refresh_all();
+        Mutex::new(sys)
+    })
+}
+
+fn get_disks_obj() -> &'static Mutex<Disks> {
+    DISKS.get_or_init(|| Mutex::new(Disks::new_with_refreshed_list()))
+}
+
+fn get_networks_obj() -> &'static Mutex<Networks> {
+    NETWORKS.get_or_init(|| Mutex::new(Networks::new_with_refreshed_list()))
+}
 
 pub fn get_cpus() -> Vec<CpuMetrics> {
-    let mut sys = System::new_all();
-    sys.refresh_cpu_usage();
+    let sys_mutex = get_system();
+    let mut sys = sys_mutex.lock().unwrap();
+    sys.refresh_cpu_specifics(CpuRefreshKind::new().with_cpu_usage());
+    
     sys.cpus()
         .iter()
         .map(|cpu| CpuMetrics {
@@ -15,19 +39,24 @@ pub fn get_cpus() -> Vec<CpuMetrics> {
 }
 
 pub fn get_memory() -> MemoryMetrics {
-    let mut sys = System::new_all();
-    sys.refresh_memory();
+    let sys_mutex = get_system();
+    let mut sys = sys_mutex.lock().unwrap();
+    sys.refresh_memory_specifics(MemoryRefreshKind::new().with_ram());
+    
     MemoryMetrics {
-        total_kb: sys.total_memory(),
-        free_kb: sys.free_memory(),
-        used_kb: sys.used_memory(),
-        available_kb: sys.available_memory(),
+        total_bytes: sys.total_memory(),
+        free_bytes: sys.free_memory(),
+        used_bytes: sys.used_memory(),
+        available_bytes: sys.available_memory(),
     }
 }
 
 pub fn get_disks() -> Vec<DiskMetrics> {
-    let disks_obj = Disks::new_with_refreshed_list();
-    disks_obj
+    let disks_mutex = get_disks_obj();
+    let mut disks = disks_mutex.lock().unwrap();
+    disks.refresh_list();
+    
+    disks
         .iter()
         .map(|disk| DiskMetrics {
             name: disk.name().to_string_lossy().into_owned(),
@@ -39,8 +68,11 @@ pub fn get_disks() -> Vec<DiskMetrics> {
 }
 
 pub fn get_networks() -> Vec<NetworkMetrics> {
-    let networks_obj = Networks::new_with_refreshed_list();
-    networks_obj
+    let networks_mutex = get_networks_obj();
+    let mut networks = networks_mutex.lock().unwrap();
+    networks.refresh();
+    
+    networks
         .iter()
         .map(|(name, data)| NetworkMetrics {
             interface: name.clone(),
