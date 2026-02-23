@@ -2,15 +2,11 @@ pub mod platform;
 pub mod types;
 
 use libc::c_char;
+use serde::Serialize;
 use std::ffi::CString;
 
-/// Returns a JSON string containing the VPS metrics.
-/// The caller is responsible for freeing the memory using `free_metrics_string`.
-#[no_mangle]
-pub extern "C" fn get_vps_metrics() -> *mut c_char {
-    let all_metrics = platform::get_metrics();
-
-    match serde_json::to_string(&all_metrics) {
+fn to_c_string<T: Serialize>(data: &T) -> *mut c_char {
+    match serde_json::to_string(data) {
         Ok(json) => match CString::new(json) {
             Ok(c_str) => c_str.into_raw(),
             Err(_) => std::ptr::null_mut(),
@@ -19,13 +15,45 @@ pub extern "C" fn get_vps_metrics() -> *mut c_char {
     }
 }
 
-/// Frees a string allocated by `get_vps_metrics`.
+/// Returns a JSON string containing CPU metrics.
 #[no_mangle]
-pub extern "C" fn free_metrics_string(s: *mut c_char) {
+pub extern "C" fn get_cpu_metrics() -> *mut c_char {
+    to_c_string(&platform::get_cpus())
+}
+
+/// Returns a JSON string containing Memory metrics.
+#[no_mangle]
+pub extern "C" fn get_memory_metrics() -> *mut c_char {
+    to_c_string(&platform::get_memory())
+}
+
+/// Returns a JSON string containing Disk metrics.
+#[no_mangle]
+pub extern "C" fn get_disk_metrics() -> *mut c_char {
+    to_c_string(&platform::get_disks())
+}
+
+/// Returns a JSON string containing Network metrics.
+#[no_mangle]
+pub extern "C" fn get_network_metrics() -> *mut c_char {
+    to_c_string(&platform::get_networks())
+}
+
+/// Returns the system uptime in seconds.
+#[no_mangle]
+pub extern "C" fn get_uptime() -> u64 {
+    platform::get_uptime()
+}
+
+/// Frees a string allocated by any of the metrics functions.
+///
+/// # Safety
+/// The pointer must have been returned by one of the metrics functions in this library
+/// and must not have been freed yet.
+#[no_mangle]
+pub unsafe extern "C" fn free_metrics_string(s: *mut c_char) {
     if s.is_null() {
         return;
     }
-    unsafe {
-        let _ = CString::from_raw(s);
-    }
+    let _ = CString::from_raw(s);
 }

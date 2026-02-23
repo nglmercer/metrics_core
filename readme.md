@@ -7,6 +7,7 @@ A high-performance, cross-platform system metrics extraction library written in 
 ## Why This Library?
 
 Most monitoring solutions either:
+
 - Are too high-level (don't give you raw data)
 - Require language-specific agents (Python scripts, Node modules)
 - Lack cross-platform support
@@ -17,10 +18,10 @@ Most monitoring solutions either:
 
 ## Supported Platforms
 
-| Platform | Status | Binary |
-|----------|--------|--------|
-| Linux    | ✅ Full | `libmetrics.so` |
-| Windows  | ✅ Full | `metrics.dll` |
+| Platform | Status  | Binary             |
+| -------- | ------- | ------------------ |
+| Linux    | ✅ Full | `libmetrics.so`    |
+| Windows  | ✅ Full | `metrics.dll`      |
 | macOS    | ✅ Full | `libmetrics.dylib` |
 
 ---
@@ -29,17 +30,45 @@ Most monitoring solutions either:
 
 All functions use the C ABI (`extern "C"`) and are name-mangled for easy discovery.
 
-### `get_vps_metrics`
+### `get_cpu_metrics`
 
 ```c
-char* get_vps_metrics();
+char* get_cpu_metrics();
 ```
 
-Returns a **JSON string** containing all system metrics. The caller **must** free the returned string using `free_metrics_string()` to prevent memory leaks.
+Returns a **JSON array** of CPU metrics.
 
-**Return value:** JSON string (caller frees with `free_metrics_string`) or `NULL` on error.
+### `get_memory_metrics`
 
----
+```c
+char* get_memory_metrics();
+```
+
+Returns a **JSON object** of memory metrics.
+
+### `get_disk_metrics`
+
+```c
+char* get_disk_metrics();
+```
+
+Returns a **JSON array** of disk metrics.
+
+### `get_network_metrics`
+
+```c
+char* get_network_metrics();
+```
+
+Returns a **JSON array** of network interface metrics.
+
+### `get_uptime`
+
+```c
+uint64_t get_uptime();
+```
+
+Returns the system uptime in seconds. (Does not return a pointer, no need to free).
 
 ### `free_metrics_string`
 
@@ -47,70 +76,59 @@ Returns a **JSON string** containing all system metrics. The caller **must** fre
 void free_metrics_string(char* s);
 ```
 
-Frees the memory allocated by `get_vps_metrics()`. Always call this after processing the JSON.
-
-**Parameters:**
-- `s` — Pointer to the string returned by `get_vps_metrics()`
+Frees the memory allocated by any function returning a `char*`. Always call this after processing the JSON.
 
 ---
 
-## JSON Output Schema
+## JSON Output Schemas
 
-The returned JSON follows this structure:
+### CPU Metrics (`get_cpu_metrics`)
+
+```json
+[
+  {
+    "usage_pct": 15.5,
+    "brand": "AMD EPYC 7642 48-Core Processor",
+    "frequency": 2299
+  }
+]
+```
+
+### Memory Metrics (`get_memory_metrics`)
 
 ```json
 {
-  "cpus": [
-    {
-      "usage_pct": 15.5,
-      "brand": "AMD EPYC 7642 48-Core Processor",
-      "frequency": 2299
-    }
-  ],
-  "memory": {
-    "total_kb": 16777216,
-    "free_kb": 8192000,
-    "used_kb": 7500000,
-    "available_kb": 9200000
-  },
-  "disks": [
-    {
-      "name": "/dev/sda",
-      "total_space": 500000000000,
-      "available_space": 200000000000,
-      "mount_point": "/"
-    }
-  ],
-  "networks": [
-    {
-      "interface": "eth0",
-      "received_bytes": 1234567890,
-      "transmitted_bytes": 987654321
-    }
-  ],
-  "uptime_sec": 3600000
+  "total_kb": 16777216,
+  "free_kb": 8192000,
+  "used_kb": 7500000,
+  "available_kb": 9200000
 }
 ```
 
-### Field Definitions
+### Disk Metrics (`get_disk_metrics`)
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `cpus[].usage_pct` | f32 | CPU usage percentage (0-100) |
-| `cpus[].brand` | string | CPU model name |
-| `cpus[].frequency` | u64 | CPU frequency in MHz |
-| `memory.total_kb` | u64 | Total memory in KB |
-| `memory.free_kb` | u64 | Free memory in KB |
-| `memory.used_kb` | u64 | Used memory in KB |
-| `memory.available_kb` | u64 | Available memory in KB |
-| `disks[].name` | string | Disk device name |
-| `disks[].total_space` | u64 | Total disk space in bytes |
-| `disks[].available_space` | u64 | Available disk space in bytes |
-| `disks[].mount_point` | string | Mount point path |
-| `networks[].interface` | string | Network interface name |
-| `networks[].received_bytes` | u64 | Total bytes received |
-| `networks[].transmitted_bytes` | u64 | Total bytes transmitted |
-| `uptime_sec` | u64 | System uptime in seconds |
+```json
+[
+  {
+    "name": "/dev/sda",
+    "total_space": 500000000000,
+    "available_space": 200000000000,
+    "mount_point": "/"
+  }
+]
+```
+
+### Network Metrics (`get_network_metrics`)
+
+```json
+[
+  {
+    "interface": "eth0",
+    "received_bytes": 1234567890,
+    "transmitted_bytes": 987654321
+  }
+]
+```
 
 ---
 
@@ -135,6 +153,7 @@ cargo build --release --lib
 ```
 
 The compiled library will be in:
+
 - Debug: `target/debug/libmetrics.so` (Linux), `target/debug/metrics.dll` (Windows)
 - Release: `target/release/libmetrics.so` (Linux), `target/release/metrics.dll` (Windows)
 
@@ -147,127 +166,90 @@ The compiled library will be in:
 ```python
 import ctypes
 import json
-import os
 
-# Load the shared library
 lib = ctypes.CDLL("./libmetrics.so")
+lib.get_cpu_metrics.restype = ctypes.c_char_p
+lib.get_memory_metrics.restype = ctypes.c_char_p
 
-# Define return type
-lib.get_vps_metrics.restype = ctypes.c_char_p
+# Access specific components
+cpu_json = lib.get_cpu_metrics()
+print(json.loads(cpu_json.decode()))
+lib.free_metrics_string(cpu_json)
 
-# Call the function
-json_str = lib.get_vps_metrics()
-if json_str:
-    metrics = json.loads(json_str.decode("utf-8"))
-    
-    print(f"CPU Usage: {metrics['cpus'][0]['usage_pct']}%")
-    print(f"Memory Available: {metrics['memory']['available_kb']} KB")
-    print(f"Uptime: {metrics['uptime_sec']} seconds")
-    
-    # CRITICAL: Free the memory!
-    lib.free_metrics_string(json_str)
-else:
-    print("Failed to get metrics")
+# Access non-string return types
+uptime = lib.get_uptime()
+print(f"Uptime: {uptime}s")
 ```
 
 ### Node.js (ffi-napi)
 
 ```javascript
-const ffi = require('ffi-napi');
-const ref = require('ref-napi');
-
-// Define types
-const charPtr = ref.refType(ref.types.char);
-
-// Load library
-const metrics = ffi.Library('./libmetrics', {
-  get_vps_metrics: [charPtr, []],
-  free_metrics_string: ['void', [charPtr]]
+const ffi = require("ffi-napi");
+const metrics = ffi.Library("./libmetrics", {
+  get_cpu_metrics: ["string", []],
+  get_uptime: ["uint64", []],
+  free_metrics_string: ["void", ["string"]],
 });
 
-// Get metrics
-const jsonPtr = metrics.get_vps_metrics();
-const jsonStr = jsonPtr.readCString();
-
-const metricsData = JSON.parse(jsonStr);
-
-console.log(`CPU Usage: ${metricsData.cpus[0].usage_pct}%`);
-console.log(`Memory Available: ${metricsData.memory.available_kb} KB`);
-
-// Free memory
-metrics.free_metrics_string(jsonPtr);
+console.log(JSON.parse(metrics.get_cpu_metrics()));
+console.log(`Uptime: ${metrics.get_uptime()}s`);
 ```
 
 ### Go (cgo)
 
 ```go
-package main
-
 /*
 #cgo LDFLAGS: -L. -lmetrics
-#include <stdlib.h>
-#include <string.h>
-
-extern char* get_vps_metrics();
+extern char* get_cpu_metrics();
+extern long long get_uptime();
 extern void free_metrics_string(char* s);
 */
 import "C"
-import (
-	"encoding/json"
-	"fmt"
-	"unsafe"
-)
+import "fmt"
 
 func main() {
-	// Get metrics
-	cStr := C.get_vps_metrics()
-	if cStr == nil {
-		panic("Failed to get metrics")
-	}
-
-	// Convert to Go string
-	jsonStr := C.GoString(cStr)
-
-	// Parse JSON
-	var metrics map[string]interface{}
-	json.Unmarshal([]byte(jsonStr), &metrics)
-
-	// Print some data
-	cpus := metrics["cpus"].([]interface{})
-	cpu := cpus[0].(map[string]interface{})
-	fmt.Printf("CPU Usage: %v%%\n", cpu["usage_pct"])
-	fmt.Printf("Memory Available: %v KB\n", metrics["memory"].(map[string]interface{})["available_kb"])
-
-	// Free memory
-	C.free_metrics_string(cStr)
+    cStr := C.get_cpu_metrics()
+    fmt.Println(C.GoString(cStr))
+    C.free_metrics_string(cStr)
+    fmt.Printf("Uptime: %d\n", C.get_uptime())
 }
+```
+
+### Bun (FFI)
+
+```typescript
+import { dlopen, FFIType, ptr } from "bun:ffi";
+
+const path = `libmetrics.${process.platform === "win32" ? "dll" : process.platform === "darwin" ? "dylib" : "so"}`;
+
+const lib = dlopen(path, {
+  get_cpu_metrics: { returns: FFIType.cstring, args: [] },
+  get_memory_metrics: { returns: FFIType.cstring, args: [] },
+  get_uptime: { returns: FFIType.u64, args: [] },
+});
+
+console.log("CPU:", JSON.parse(lib.symbols.get_cpu_metrics()!));
+console.log("Memory:", JSON.parse(lib.symbols.get_memory_metrics()!));
+console.log("Uptime:", lib.symbols.get_uptime(), "s");
 ```
 
 ### C / C++
 
 ```c
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include <stdint.h>
 
-// Function declarations
-char* get_vps_metrics();
+char* get_cpu_metrics();
+uint64_t get_uptime();
 void free_metrics_string(char* s);
 
 int main() {
-    // Get metrics
-    char* json_str = get_vps_metrics();
-    if (json_str == NULL) {
-        fprintf(stderr, "Failed to get metrics\n");
-        return 1;
+    char* json = get_cpu_metrics();
+    if (json) {
+        printf("CPU: %s\n", json);
+        free_metrics_string(json);
     }
-
-    // Process JSON (use your favorite JSON library)
-    printf("Raw JSON: %s\n", json_str);
-
-    // IMPORTANT: Free the memory!
-    free_metrics_string(json_str);
-
+    printf("Uptime: %lu s\n", get_uptime());
     return 0;
 }
 ```
@@ -276,47 +258,26 @@ int main() {
 
 ## Integration with VPS Panels
 
-This library is designed to be the **core metrics engine** for VPS management panels. The typical integration pattern is:
+This library is designed to be the **core metrics engine** for VPS management panels. The component-based design allows you to fetch only the data you need, reducing overhead.
 
-1. **Build** the library for your target OS
-2. **Distribute** the binary alongside your panel agent
-3. **Call** `get_vps_metrics()` on a configurable interval (e.g., every 5 seconds)
-4. **Parse** the JSON and store/display the metrics
-5. **Free** the string to prevent memory leaks
-
-### Example: Updating a Prometheus exporter
+### Example: Updating a Prometheus exporter (Python)
 
 ```python
 import ctypes
 import json
 import time
-from prometheus_client import Gauge, start_http_server
 
-# Define Prometheus metrics
-cpu_gauge = Gauge('vps_cpu_percent', 'CPU usage percentage')
-mem_gauge = Gauge('vps_memory_available_kb', 'Available memory in KB')
-disk_gauge = Gauge('vps_disk_available_bytes', 'Available disk space in bytes')
-
-# Load library
 lib = ctypes.CDLL("./libmetrics.so")
-lib.get_vps_metrics.restype = ctypes.c_char_p
+lib.get_cpu_metrics.restype = ctypes.c_char_p
 
 def collect_metrics():
-    json_str = lib.get_vps_metrics()
-    if json_str:
-        data = json.loads(json_str.decode())
-        
-        # Update Prometheus gauges
-        cpu_gauge.set(data['cpus'][0]['usage_pct'])
-        mem_gauge.set(data['memory']['available_kb'])
-        disk_gauge.set(data['disks'][0]['available_space'])
-        
-        lib.free_metrics_string(json_str)
+    # Only fetch CPU if that's all we need
+    cpu_json = lib.get_cpu_metrics()
+    if cpu_json:
+        data = json.loads(cpu_json.decode())
+        # Update your gauges here...
+        lib.free_metrics_string(cpu_json)
 
-# Start Prometheus server
-start_http_server(9090)
-
-# Collect metrics every 5 seconds
 while True:
     collect_metrics()
     time.sleep(5)
@@ -326,12 +287,12 @@ while True:
 
 ## Dependencies
 
-| Crate | Version | Purpose |
-|-------|---------|---------|
-| `sysinfo` | 0.30+ | Cross-platform system information (CPU, memory, disks, networks) |
-| `serde` | 1.0+ | Serialization framework |
-| `serde_json` | 1.0+ | JSON output |
-| `libc` | 0.2+ | C type definitions for FFI |
+| Crate        | Version | Purpose                                                          |
+| ------------ | ------- | ---------------------------------------------------------------- |
+| `sysinfo`    | 0.30+   | Cross-platform system information (CPU, memory, disks, networks) |
+| `serde`      | 1.0+    | Serialization framework                                          |
+| `serde_json` | 1.0+    | JSON output                                                      |
+| `libc`       | 0.2+    | C type definitions for FFI                                       |
 
 ---
 
@@ -344,6 +305,7 @@ MIT License — free to use, modify, and distribute.
 ## Contributing
 
 Contributions are welcome! Please ensure:
+
 1. New platform implementations follow the existing pattern in `src/platform/`
 2. The JSON schema remains backward-compatible
 3. All FFI functions are marked with `#[no_mangle]` and `extern "C"`

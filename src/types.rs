@@ -29,12 +29,3 @@ pub struct NetworkMetrics {
     pub received_bytes: u64,
     pub transmitted_bytes: u64,
 }
-
-#[derive(Serialize)]
-pub struct AllMetrics {
-    pub cpus: Vec<CpuMetrics>,
-    pub memory: MemoryMetrics,
-    pub disks: Vec<DiskMetrics>,
-    pub networks: Vec<NetworkMetrics>,
-    pub uptime_sec: u64,
-}
