@@ -10,7 +10,7 @@ import sys
 from typing import Optional, TypeVar, Callable
 
 try:
-    from .types import (
+    from .metrics_types import (
         AllMetrics,
         BatteryInfo,
         LibraryVersion,
@@ -30,25 +30,50 @@ try:
         dict_to_battery_info,
     )
 except (ImportError, ValueError):
-    from types import (
-        AllMetrics,
-        BatteryInfo,
-        LibraryVersion,
-        CpuMetrics,
-        MemoryMetrics,
-        DiskMetrics,
-        NetworkMetrics,
-        OsInfo,
-        LoadAverage,
-        ComponentMetrics,
-        ProcessMetrics,
-        ExtendedProcessMetrics,
-        DiskIoMetrics,
-        NetworkIoMetrics,
-        RefreshFlags,
-        dict_to_all_metrics,
-        dict_to_battery_info,
-    )
+    try:
+        from metrics_types import (
+            AllMetrics,
+            BatteryInfo,
+            LibraryVersion,
+            CpuMetrics,
+            MemoryMetrics,
+            DiskMetrics,
+            NetworkMetrics,
+            OsInfo,
+            LoadAverage,
+            ComponentMetrics,
+            ProcessMetrics,
+            ExtendedProcessMetrics,
+            DiskIoMetrics,
+            NetworkIoMetrics,
+            RefreshFlags,
+            dict_to_all_metrics,
+            dict_to_battery_info,
+        )
+    except ImportError:
+        # Fallback for some environments where the path might be different
+        import sys
+        import os
+        sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+        from metrics_types import (
+            AllMetrics,
+            BatteryInfo,
+            LibraryVersion,
+            CpuMetrics,
+            MemoryMetrics,
+            DiskMetrics,
+            NetworkMetrics,
+            OsInfo,
+            LoadAverage,
+            ComponentMetrics,
+            ProcessMetrics,
+            ExtendedProcessMetrics,
+            DiskIoMetrics,
+            NetworkIoMetrics,
+            RefreshFlags,
+            dict_to_all_metrics,
+            dict_to_battery_info,
+        )
 
 
 T = TypeVar('T')

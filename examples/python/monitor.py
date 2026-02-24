@@ -17,7 +17,7 @@ if current_dir not in sys.path:
 
 try:
     from .ffi import MetricsLibrary, MetricsLibraryError, create_metrics_library
-    from .types import AllMetrics, BatteryInfo
+    from .metrics_types import AllMetrics, BatteryInfo
     from .ui import (
         Colors,
         clear_screen,
@@ -29,18 +29,35 @@ try:
         get_color_for_percent,
     )
 except (ImportError, ValueError):
-    from ffi import MetricsLibrary, MetricsLibraryError, create_metrics_library
-    from types import AllMetrics, BatteryInfo
-    from ui import (
-        Colors,
-        clear_screen,
-        format_bytes,
-        format_uptime,
-        create_colored_progress_bar,
-        pad_right,
-        create_header,
-        get_color_for_percent,
-    )
+    try:
+        from ffi import MetricsLibrary, MetricsLibraryError, create_metrics_library
+        from metrics_types import AllMetrics, BatteryInfo
+        from ui import (
+            Colors,
+            clear_screen,
+            format_bytes,
+            format_uptime,
+            create_colored_progress_bar,
+            pad_right,
+            create_header,
+            get_color_for_percent,
+        )
+    except ImportError:
+        import ffi
+        import metrics_types
+        import ui
+        from ffi import MetricsLibrary, MetricsLibraryError, create_metrics_library
+        from metrics_types import AllMetrics, BatteryInfo
+        from ui import (
+            Colors,
+            clear_screen,
+            format_bytes,
+            format_uptime,
+            create_colored_progress_bar,
+            pad_right,
+            create_header,
+            get_color_for_percent,
+        )
 
 
 # Refresh interval in seconds

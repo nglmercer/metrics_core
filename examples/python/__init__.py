@@ -13,7 +13,7 @@ try:
         get_lib_name,
     )
 
-    from .types import (
+    from .metrics_types import (
         CpuMetrics,
         MemoryMetrics,
         DiskMetrics,
@@ -63,7 +63,7 @@ except (ImportError, ValueError):
         get_lib_name,
     )
 
-    from types import (
+    from metrics_types import (
         CpuMetrics,
         MemoryMetrics,
         DiskMetrics,
