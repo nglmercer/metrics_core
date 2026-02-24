@@ -15,6 +15,15 @@ libc = "0.2"
 starship-battery = "0.10.0"
 nvml-wrapper = "0.10"
 
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.52", features = [
+    "Win32_Networking_WinSock",
+    "Win32_NetworkManagement_IpHelper",
+    "Win32_System_Threading",
+    "Win32_Foundation",
+] }
+
+
 [profile.release]
 opt-level = 3
 lto = true

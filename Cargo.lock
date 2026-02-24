@@ -210,6 +210,7 @@ dependencies = [
  "serde_json",
  "starship-battery",
  "sysinfo",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -395,7 +396,7 @@ dependencies = [
  "num-traits",
  "plist",
  "uom",
- "windows-sys",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -585,6 +586,15 @@ name = "windows-result"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5e383302e8ec8515204254685643de10811af0ed97ea37210dc26fb0032647f8"
+dependencies = [
+ "windows-targets",
+]
+
+[[package]]
+name = "windows-sys"
+version = "0.52.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "282be5f36a8ce781fad8c8ae18fa3f9beff57ec1b52cb3de0789201425d9a33d"
 dependencies = [
  "windows-targets",
 ]
