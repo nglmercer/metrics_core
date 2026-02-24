@@ -1,6 +1,6 @@
+pub mod ffi;
 pub mod platform;
 pub mod types;
-pub mod ffi;
 
 use libc::c_char;
 use serde::Serialize;

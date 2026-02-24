@@ -15,7 +15,7 @@ Most monitoring solutions are either too high-level, require language-specific a
 | Platform | Status  | Binary             |
 | -------- | ------- | ------------------ |
 | Linux    | ✅ Full | `libmetrics.so`    |
-| Windows  | ✅ Full | `metrics.dll`       |
+| Windows  | ✅ Full | `metrics.dll`      |
 | macOS    | ✅ Full | `libmetrics.dylib` |
 
 ---
@@ -105,12 +105,15 @@ Returns a **JSON object** containing all system metrics at once (CPU, Memory, Di
 Refreshes internal metric caches based on the provided flags. Use this for better performance when you need to call multiple metric functions.
 
 **Flags:**
+
 - `1` (REFRESH_CPU): Refresh CPU metrics
 - `2` (REFRESH_MEMORY): Refresh memory metrics
 - `4` (REFRESH_DISKS): Refresh disk metrics
 - `8` (REFRESH_NETWORKS): Refresh network metrics
 - `16` (REFRESH_PROCESSES): Refresh process list
 - `32` (REFRESH_COMPONENTS): Refresh component (temperature) data
+- `64` (REFRESH_GPUS): Refresh GPU metrics
+- `128` (REFRESH_NETWORK_CONNECTIONS): Refresh network connections
 - `0xFFFFFFFF` (REFRESH_ALL): Refresh all metrics
 
 ### `cleanup_metrics`
@@ -373,6 +376,7 @@ Frees the memory allocated by the library for any JSON string returned. **Must b
 ## Thread Safety
 
 The METRICS library is **thread-safe**:
+
 - Internal state is protected using `RwLock` (Readers-Writer Lock)
 - Multiple threads can read metrics simultaneously
 - Write operations (refresh) are serialized
@@ -381,6 +385,7 @@ The METRICS library is **thread-safe**:
 ### Best Practices for Thread Safety
 
 1. **Use `refresh_metrics()` once, then read multiple metrics:**
+
    ```c
    // More efficient: refresh once, then get all metrics
    refresh_metrics(REFRESH_ALL);  // Or specific flags
@@ -461,7 +466,7 @@ const lib = dlopen("./target/release/libmetrics.so", {
 });
 
 // Refresh all metrics first (more efficient)
-lib.symbols.refresh_metrics(0xFFFFFFFF);
+lib.symbols.refresh_metrics(0xffffffff);
 
 const versionPtr = lib.symbols.get_library_version();
 console.log("Version:", JSON.parse(new CString(versionPtr)));
@@ -513,4 +518,3 @@ The compiled library will be in `target/release/`.
 ## License
 
 MIT License.
-

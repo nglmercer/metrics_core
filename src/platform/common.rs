@@ -5,7 +5,9 @@ use crate::types::{
 };
 use std::sync::OnceLock;
 use std::sync::RwLock;
-use sysinfo::{Components, CpuRefreshKind, Disks, MemoryRefreshKind, Networks, ProcessesToUpdate, System};
+use sysinfo::{
+    Components, CpuRefreshKind, Disks, MemoryRefreshKind, Networks, ProcessesToUpdate, System,
+};
 
 static SYSTEM: OnceLock<RwLock<System>> = OnceLock::new();
 static DISKS: OnceLock<RwLock<Disks>> = OnceLock::new();
@@ -245,7 +247,10 @@ pub fn get_extended_processes() -> Vec<ExtendedProcessMetrics> {
             pid: pid.as_u32(),
             parent_pid: process.parent().map(|p| p.as_u32()),
             name: process.name().to_string_lossy().into_owned(),
-            command: process.cmd().first().map(|c| c.to_string_lossy().into_owned()),
+            command: process
+                .cmd()
+                .first()
+                .map(|c| c.to_string_lossy().into_owned()),
             cpu_usage: process.cpu_usage(),
             memory_bytes: process.memory(),
             disk_read_bytes: process.disk_usage().read_bytes,
@@ -395,45 +400,56 @@ pub fn cleanup_metrics() {
 /// Returns GPU metrics using NVML (NVIDIA GPUs only)
 pub fn get_gpus() -> Vec<GpuMetrics> {
     let mut results = Vec::new();
-    
+
     // Try to initialize NVML
     let nvml = match nvml_wrapper::Nvml::init() {
         Ok(n) => n,
         Err(_) => return Vec::new(), // No NVIDIA GPU or NVML not available
     };
-    
+
     // Get device count
     let device_count = match nvml.device_count() {
         Ok(c) => c,
         Err(_) => return Vec::new(),
     };
-    
+
     for i in 0..device_count {
         if let Ok(device) = nvml.device_by_index(i) {
             let memory_info = device.memory_info().ok();
             let utilization = device.utilization_rates().ok();
-            
+
             let gpu = GpuMetrics {
                 index: i,
                 name: device.name().unwrap_or_else(|_| "Unknown".to_string()),
                 brand: "NVIDIA".to_string(),
-                driver_version: nvml.sys_driver_version().unwrap_or_else(|_| "Unknown".to_string()),
+                driver_version: nvml
+                    .sys_driver_version()
+                    .unwrap_or_else(|_| "Unknown".to_string()),
                 memory_total_bytes: memory_info.as_ref().map(|m| m.total).unwrap_or(0),
                 memory_used_bytes: memory_info.as_ref().map(|m| m.used).unwrap_or(0),
                 memory_free_bytes: memory_info.as_ref().map(|m| m.free).unwrap_or(0),
                 utilization_gpu_pct: utilization.as_ref().map(|u| u.gpu as f32).unwrap_or(0.0),
-                utilization_memory_pct: utilization.as_ref().map(|u| u.memory as f32).unwrap_or(0.0),
-                temperature_celsius: device.temperature(
-                    nvml_wrapper::enum_wrappers::device::TemperatureSensor::Gpu
-                ).unwrap_or(0) as f32,
-                power_usage_watts: device.power_usage().map(|p| p as f32 / 1000.0).unwrap_or(0.0),
-                power_limit_watts: device.power_management_limit().map(|p| p as f32 / 1000.0).unwrap_or(0.0),
+                utilization_memory_pct: utilization
+                    .as_ref()
+                    .map(|u| u.memory as f32)
+                    .unwrap_or(0.0),
+                temperature_celsius: device
+                    .temperature(nvml_wrapper::enum_wrappers::device::TemperatureSensor::Gpu)
+                    .unwrap_or(0) as f32,
+                power_usage_watts: device
+                    .power_usage()
+                    .map(|p| p as f32 / 1000.0)
+                    .unwrap_or(0.0),
+                power_limit_watts: device
+                    .power_management_limit()
+                    .map(|p| p as f32 / 1000.0)
+                    .unwrap_or(0.0),
                 fan_speed_pct: device.fan_speed(0).ok(),
             };
             results.push(gpu);
         }
     }
-    
+
     results
 }
 
@@ -454,19 +470,19 @@ pub fn get_cpu_core_temperatures() -> Vec<CpuCoreTemperature> {
         components.refresh_list();
         components.refresh();
     }
-    
+
     let components = components_rwlock.read().unwrap_or_else(|e| e.into_inner());
     let mut core_temps = Vec::new();
-    
+
     // Filter components that are CPU cores (typically labeled as "Core 0", "Core 1", etc.)
     for (index, component) in components.iter().enumerate() {
         let label = component.label();
-        
+
         // Check if this is a CPU core temperature sensor
-        if label.to_lowercase().contains("core") 
-            || label.to_lowercase().contains("cpu") 
-            || label.to_lowercase().contains("package") {
-            
+        if label.to_lowercase().contains("core")
+            || label.to_lowercase().contains("cpu")
+            || label.to_lowercase().contains("package")
+        {
             core_temps.push(CpuCoreTemperature {
                 core_index: index as u32,
                 temperature_celsius: component.temperature(),
@@ -475,7 +491,7 @@ pub fn get_cpu_core_temperatures() -> Vec<CpuCoreTemperature> {
             });
         }
     }
-    
+
     // If no specific core temps found, return all temperature components
     if core_temps.is_empty() {
         for (index, component) in components.iter().enumerate() {
@@ -487,7 +503,7 @@ pub fn get_cpu_core_temperatures() -> Vec<CpuCoreTemperature> {
             });
         }
     }
-    
+
     core_temps
 }
 
@@ -635,8 +651,10 @@ mod tests {
         for temp in &temps {
             println!(
                 "Core {}: {}°C (Max: {:?}°C, Critical: {:?}°C)",
-                temp.core_index, temp.temperature_celsius, 
-                temp.max_temperature_celsius, temp.critical_temperature_celsius
+                temp.core_index,
+                temp.temperature_celsius,
+                temp.max_temperature_celsius,
+                temp.critical_temperature_celsius
             );
         }
     }
