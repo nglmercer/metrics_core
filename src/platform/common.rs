@@ -39,7 +39,7 @@ pub fn refresh_metrics(flags: u32) {
     if flags & 1 != 0 {
         if let Some(sys) = SYSTEM.get() {
             if let Ok(mut sys) = sys.write() {
-                sys.refresh_cpu_specifics(CpuRefreshKind::new().with_cpu_usage());
+                sys.refresh_cpu_specifics(CpuRefreshKind::new().with_cpu_usage().with_frequency());
             }
         }
     }
@@ -95,7 +95,7 @@ pub fn get_cpus() -> Vec<CpuMetrics> {
     let sys_rwlock = get_system();
     {
         let mut sys = sys_rwlock.write().unwrap_or_else(|e| e.into_inner());
-        sys.refresh_cpu_specifics(CpuRefreshKind::new().with_cpu_usage());
+        sys.refresh_cpu_specifics(CpuRefreshKind::new().with_cpu_usage().with_frequency());
     }
 
     let sys = sys_rwlock.read().unwrap_or_else(|e| e.into_inner());
@@ -565,6 +565,29 @@ mod tests {
         let cpus = get_cpus();
         assert!(!cpus.is_empty());
         println!("CPU refresh test passed with {} cores", cpus.len());
+    }
+
+    #[test]
+    fn test_cpu_frequency() {
+        let cpus = get_cpus();
+        assert!(!cpus.is_empty(), "Should have at least one CPU");
+
+        for (index, cpu) in cpus.iter().enumerate() {
+            println!("CPU {}: {} @ {} MHz", index, cpu.brand, cpu.frequency);
+
+            // Frequency can be 0 on some systems/VMs, but we should log a warning
+            if cpu.frequency == 0 {
+                println!("WARNING: CPU frequency is 0 for core {}. This may be expected on VMs or certain hardware.", index);
+            } else {
+                // Verify frequency is in reasonable range (100 MHz to 10 GHz)
+                assert!(
+                    cpu.frequency >= 100 && cpu.frequency <= 10000,
+                    "CPU frequency {} MHz seems unreasonable for core {}",
+                    cpu.frequency,
+                    index
+                );
+            }
+        }
     }
 
     #[test]
