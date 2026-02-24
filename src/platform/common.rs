@@ -1,10 +1,10 @@
 use crate::types::{
-    BatteryInfo, ComponentMetrics, CpuMetrics, DiskIoMetrics, DiskMetrics, LoadAverage,
-    MemoryMetrics, NetworkIoMetrics, NetworkMetrics, OsInfo, ProcessMetrics,
-    ExtendedProcessMetrics, AllMetrics,
+    AllMetrics, BatteryInfo, ComponentMetrics, CpuMetrics, DiskIoMetrics, DiskMetrics,
+    ExtendedProcessMetrics, LoadAverage, MemoryMetrics, NetworkIoMetrics, NetworkMetrics, OsInfo,
+    ProcessMetrics,
 };
-use std::sync::RwLock;
 use std::sync::OnceLock;
+use std::sync::RwLock;
 use sysinfo::{Components, CpuRefreshKind, Disks, MemoryRefreshKind, Networks, System};
 
 static SYSTEM: OnceLock<RwLock<System>> = OnceLock::new();
@@ -16,9 +16,7 @@ static COMPONENTS: OnceLock<RwLock<Components>> = OnceLock::new();
 static OS_INFO_CACHE: OnceLock<OsInfo> = OnceLock::new();
 
 fn get_system() -> &'static RwLock<System> {
-    SYSTEM.get_or_init(|| {
-        RwLock::new(System::new())
-    })
+    SYSTEM.get_or_init(|| RwLock::new(System::new()))
 }
 
 fn get_disks_obj() -> &'static RwLock<Disks> {
@@ -43,7 +41,7 @@ pub fn refresh_metrics(flags: u32) {
             }
         }
     }
-    
+
     // Memory refresh
     if flags & 2 != 0 {
         if let Some(sys) = SYSTEM.get() {
@@ -52,7 +50,7 @@ pub fn refresh_metrics(flags: u32) {
             }
         }
     }
-    
+
     // Disks refresh
     if flags & 4 != 0 {
         if let Some(disks) = DISKS.get() {
@@ -61,7 +59,7 @@ pub fn refresh_metrics(flags: u32) {
             }
         }
     }
-    
+
     // Networks refresh
     if flags & 8 != 0 {
         if let Some(networks) = NETWORKS.get() {
@@ -70,7 +68,7 @@ pub fn refresh_metrics(flags: u32) {
             }
         }
     }
-    
+
     // Processes refresh
     if flags & 16 != 0 {
         if let Some(sys) = SYSTEM.get() {
@@ -79,7 +77,7 @@ pub fn refresh_metrics(flags: u32) {
             }
         }
     }
-    
+
     // Components refresh
     if flags & 32 != 0 {
         if let Some(components) = COMPONENTS.get() {
@@ -177,14 +175,14 @@ pub fn get_os_info() -> OsInfo {
     if let Some(cached) = OS_INFO_CACHE.get() {
         return cached.clone();
     }
-    
+
     let os_info = OsInfo {
         name: System::name().unwrap_or_default(),
         kernel_version: System::kernel_version().unwrap_or_default(),
         os_version: System::os_version().unwrap_or_default(),
         host_name: System::host_name().unwrap_or_default(),
     };
-    
+
     // Cache the OS info
     let _ = OS_INFO_CACHE.set(os_info.clone());
     os_info
@@ -262,7 +260,7 @@ pub fn get_extended_processes() -> Vec<ExtendedProcessMetrics> {
 pub fn get_process_by_pid(pid: u32) -> Option<ProcessMetrics> {
     let sys_rwlock = get_system();
     let pid_obj = sysinfo::Pid::from(pid as usize);
-    
+
     {
         let mut sys = sys_rwlock.write().unwrap_or_else(|e| e.into_inner());
         if !sys.refresh_process(pid_obj) {
@@ -408,14 +406,21 @@ mod tests {
     #[test]
     fn test_load_average() {
         let load = get_load_average();
-        println!("Load Average: 1m={}, 5m={}, 15m={}", load.one_min, load.five_min, load.fifteen_min);
+        println!(
+            "Load Average: 1m={}, 5m={}, 15m={}",
+            load.one_min, load.five_min, load.fifteen_min
+        );
     }
 
     #[test]
     fn test_all_metrics() {
         let all = get_all_metrics();
         assert!(!all.cpu.is_empty());
-        println!("All metrics: CPU count={}, Memory used={}", all.cpu.len(), all.memory.used_bytes);
+        println!(
+            "All metrics: CPU count={}, Memory used={}",
+            all.cpu.len(),
+            all.memory.used_bytes
+        );
     }
 
     #[test]
@@ -446,7 +451,10 @@ mod tests {
         assert!(!processes.is_empty());
         println!("Found {} processes", processes.len());
         if let Some(p) = processes.first() {
-            println!("Extended process: {} (PID: {}, Parent: {:?})", p.name, p.pid, p.parent_pid);
+            println!(
+                "Extended process: {} (PID: {}, Parent: {:?})",
+                p.name, p.pid, p.parent_pid
+            );
         }
     }
 

@@ -1,5 +1,6 @@
 pub mod platform;
 pub mod types;
+pub mod ffi;
 
 use libc::c_char;
 use serde::Serialize;
@@ -131,7 +132,7 @@ pub extern "C" fn get_all_metrics() -> *mut c_char {
 }
 
 /// Refreshes internal metric caches based on the provided flags.
-/// 
+///
 /// Flags:
 /// - 1 (REFRESH_CPU): Refresh CPU metrics
 /// - 2 (REFRESH_MEMORY): Refresh memory metrics
