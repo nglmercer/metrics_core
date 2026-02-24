@@ -1,7 +1,11 @@
 mod common;
+pub mod gpus;
+pub mod network_connections;
 
 #[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
 pub use common::*;
+pub use gpus::get_gpus;
+pub use network_connections::get_network_connections;
 
 #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
 use crate::types::*;
