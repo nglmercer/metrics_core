@@ -112,6 +112,9 @@ pub fn get_all_metrics() -> AllMetrics {
         load_avg: get_load_average(),
         batteries: Vec::new(),
         components: Vec::new(),
+        gpus: Vec::new(),
+        network_connections: Vec::new(),
+        cpu_core_temperatures: Vec::new(),
     }
 }
 
@@ -120,3 +123,18 @@ pub fn refresh_metrics(_flags: u32) {}
 
 #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
 pub fn cleanup_metrics() {}
+
+#[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
+pub fn get_gpus() -> Vec<crate::types::GpuMetrics> {
+    Vec::new()
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
+pub fn get_network_connections() -> Vec<crate::types::NetworkConnection> {
+    Vec::new()
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
+pub fn get_cpu_core_temperatures() -> Vec<crate::types::CpuCoreTemperature> {
+    Vec::new()
+}

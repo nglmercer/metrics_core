@@ -131,6 +131,24 @@ pub extern "C" fn get_all_metrics() -> *mut c_char {
     to_c_string(&platform::get_all_metrics())
 }
 
+/// Returns a JSON string containing GPU metrics (NVIDIA).
+#[no_mangle]
+pub extern "C" fn get_gpu_metrics() -> *mut c_char {
+    to_c_string(&platform::get_gpus())
+}
+
+/// Returns a JSON string containing network connections.
+#[no_mangle]
+pub extern "C" fn get_network_connections() -> *mut c_char {
+    to_c_string(&platform::get_network_connections())
+}
+
+/// Returns a JSON string containing CPU core temperatures.
+#[no_mangle]
+pub extern "C" fn get_cpu_core_temperatures() -> *mut c_char {
+    to_c_string(&platform::get_cpu_core_temperatures())
+}
+
 /// Refreshes internal metric caches based on the provided flags.
 ///
 /// Flags:

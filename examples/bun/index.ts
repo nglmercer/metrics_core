@@ -210,6 +210,12 @@ class SystemMonitor {
   private sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
+  /**
+   * get all metrics
+   */
+  public getAllMetrics() {
+    return this.lib.getAllMetrics();
+  }
 }
 
 /**

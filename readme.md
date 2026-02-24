@@ -84,9 +84,21 @@ Returns a **JSON array** of battery information (status, health, charge).
 
 Returns a **JSON object** containing system load averages (1, 5, and 15 minute averages).
 
+### `get_gpu_metrics`
+
+Returns a **JSON array** of GPU metrics (NVIDIA GPUs only). Returns an empty array if no NVIDIA GPU is detected.
+
+### `get_network_connections`
+
+Returns a **JSON array** of network connections (TCP/UDP). Note: This feature is currently limited.
+
+### `get_cpu_core_temperatures`
+
+Returns a **JSON array** of CPU core temperature readings with per-core temperatures, max, and critical values.
+
 ### `get_all_metrics`
 
-Returns a **JSON object** containing all system metrics at once (CPU, Memory, Disks, Networks, Uptime, OS Info, Load Average, Batteries, Components).
+Returns a **JSON object** containing all system metrics at once (CPU, Memory, Disks, Networks, Uptime, OS Info, Load Average, Batteries, Components, GPUs, Network Connections, CPU Core Temperatures).
 
 ### `refresh_metrics(flags: u32)`
 
@@ -285,6 +297,58 @@ Frees the memory allocated by the library for any JSON string returned. **Must b
 }
 ```
 
+### GPU Metrics
+
+```json
+[
+  {
+    "index": 0,
+    "name": "NVIDIA GeForce RTX 3080",
+    "brand": "NVIDIA",
+    "driver_version": "535.154.05",
+    "memory_total_bytes": 10737418240,
+    "memory_used_bytes": 4294967296,
+    "memory_free_bytes": 6442450944,
+    "utilization_gpu_pct": 45.0,
+    "utilization_memory_pct": 40.0,
+    "temperature_celsius": 65.0,
+    "power_usage_watts": 220.0,
+    "power_limit_watts": 320.0,
+    "fan_speed_pct": 50
+  }
+]
+```
+
+### CPU Core Temperatures
+
+```json
+[
+  {
+    "core_index": 0,
+    "temperature_celsius": 45.0,
+    "max_temperature_celsius": 100.0,
+    "critical_temperature_celsius": 105.0
+  }
+]
+```
+
+### Network Connections
+
+```json
+[
+  {
+    "protocol": "tcp",
+    "local_address": "192.168.1.100:443",
+    "local_port": 443,
+    "remote_address": "10.0.0.1:54321",
+    "remote_port": 54321,
+    "state": "Established",
+    "pid": 1234,
+    "process_name": "chrome"
+  }
+]
+```
+
 ### All Metrics
 
 ```json
@@ -297,7 +361,10 @@ Frees the memory allocated by the library for any JSON string returned. **Must b
   "os_info": {...},
   "load_avg": {...},
   "batteries": [...],
-  "components": [...]
+  "components": [...],
+  "gpus": [...],
+  "network_connections": [...],
+  "cpu_core_temperatures": [...]
 }
 ```
 

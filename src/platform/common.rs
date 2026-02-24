@@ -1,11 +1,11 @@
 use crate::types::{
-    AllMetrics, BatteryInfo, ComponentMetrics, CpuMetrics, DiskIoMetrics, DiskMetrics,
-    ExtendedProcessMetrics, LoadAverage, MemoryMetrics, NetworkIoMetrics, NetworkMetrics, OsInfo,
-    ProcessMetrics,
+    AllMetrics, BatteryInfo, ComponentMetrics, CpuCoreTemperature, CpuMetrics, DiskIoMetrics,
+    DiskMetrics, ExtendedProcessMetrics, GpuMetrics, LoadAverage, MemoryMetrics, NetworkConnection,
+    NetworkIoMetrics, NetworkMetrics, OsInfo, ProcessMetrics,
 };
 use std::sync::OnceLock;
 use std::sync::RwLock;
-use sysinfo::{Components, CpuRefreshKind, Disks, MemoryRefreshKind, Networks, System};
+use sysinfo::{Components, CpuRefreshKind, Disks, MemoryRefreshKind, Networks, ProcessesToUpdate, System};
 
 static SYSTEM: OnceLock<RwLock<System>> = OnceLock::new();
 static DISKS: OnceLock<RwLock<Disks>> = OnceLock::new();
@@ -73,7 +73,7 @@ pub fn refresh_metrics(flags: u32) {
     if flags & 16 != 0 {
         if let Some(sys) = SYSTEM.get() {
             if let Ok(mut sys) = sys.write() {
-                sys.refresh_processes();
+                sys.refresh_processes(ProcessesToUpdate::All, true);
             }
         }
     }
@@ -212,7 +212,7 @@ pub fn get_processes() -> Vec<ProcessMetrics> {
     let sys_rwlock = get_system();
     {
         let mut sys = sys_rwlock.write().unwrap_or_else(|e| e.into_inner());
-        sys.refresh_processes();
+        sys.refresh_processes(ProcessesToUpdate::All, true);
     }
 
     let sys = sys_rwlock.read().unwrap_or_else(|e| e.into_inner());
@@ -220,7 +220,7 @@ pub fn get_processes() -> Vec<ProcessMetrics> {
         .iter()
         .map(|(pid, process)| ProcessMetrics {
             pid: pid.as_u32(),
-            name: process.name().to_string(),
+            name: process.name().to_string_lossy().into_owned(),
             cpu_usage: process.cpu_usage(),
             memory_bytes: process.memory(),
             disk_read_bytes: process.disk_usage().read_bytes,
@@ -235,7 +235,7 @@ pub fn get_extended_processes() -> Vec<ExtendedProcessMetrics> {
     let sys_rwlock = get_system();
     {
         let mut sys = sys_rwlock.write().unwrap_or_else(|e| e.into_inner());
-        sys.refresh_processes();
+        sys.refresh_processes(ProcessesToUpdate::All, true);
     }
 
     let sys = sys_rwlock.read().unwrap_or_else(|e| e.into_inner());
@@ -244,8 +244,8 @@ pub fn get_extended_processes() -> Vec<ExtendedProcessMetrics> {
         .map(|(pid, process)| ExtendedProcessMetrics {
             pid: pid.as_u32(),
             parent_pid: process.parent().map(|p| p.as_u32()),
-            name: process.name().to_string(),
-            command: process.cmd().first().map(|c| c.to_string()),
+            name: process.name().to_string_lossy().into_owned(),
+            command: process.cmd().first().map(|c| c.to_string_lossy().into_owned()),
             cpu_usage: process.cpu_usage(),
             memory_bytes: process.memory(),
             disk_read_bytes: process.disk_usage().read_bytes,
@@ -263,15 +263,13 @@ pub fn get_process_by_pid(pid: u32) -> Option<ProcessMetrics> {
 
     {
         let mut sys = sys_rwlock.write().unwrap_or_else(|e| e.into_inner());
-        if !sys.refresh_process(pid_obj) {
-            return None;
-        }
+        sys.refresh_processes(ProcessesToUpdate::Some(&[pid_obj]), false);
     }
 
     let sys = sys_rwlock.read().unwrap_or_else(|e| e.into_inner());
     sys.process(pid_obj).map(|process| ProcessMetrics {
         pid,
-        name: process.name().to_string(),
+        name: process.name().to_string_lossy().into_owned(),
         cpu_usage: process.cpu_usage(),
         memory_bytes: process.memory(),
         disk_read_bytes: process.disk_usage().read_bytes,
@@ -285,7 +283,7 @@ pub fn get_disk_io() -> DiskIoMetrics {
     let sys_rwlock = get_system();
     {
         let mut sys = sys_rwlock.write().unwrap_or_else(|e| e.into_inner());
-        sys.refresh_processes();
+        sys.refresh_processes(ProcessesToUpdate::All, true);
     }
 
     let sys = sys_rwlock.read().unwrap_or_else(|e| e.into_inner());
@@ -381,6 +379,9 @@ pub fn get_all_metrics() -> AllMetrics {
         load_avg: get_load_average(),
         batteries: get_batteries(),
         components: get_components(),
+        gpus: get_gpus(),
+        network_connections: get_network_connections(),
+        cpu_core_temperatures: get_cpu_core_temperatures(),
     }
 }
 
@@ -389,6 +390,105 @@ pub fn cleanup_metrics() {
     // This function can be expanded if we switch to a different lazy init strategy
     // or when OnceLock::take() becomes stable (though it's not clear it will).
     // For now, this is a placeholder to satisfy the FFI requirement.
+}
+
+/// Returns GPU metrics using NVML (NVIDIA GPUs only)
+pub fn get_gpus() -> Vec<GpuMetrics> {
+    let mut results = Vec::new();
+    
+    // Try to initialize NVML
+    let nvml = match nvml_wrapper::Nvml::init() {
+        Ok(n) => n,
+        Err(_) => return Vec::new(), // No NVIDIA GPU or NVML not available
+    };
+    
+    // Get device count
+    let device_count = match nvml.device_count() {
+        Ok(c) => c,
+        Err(_) => return Vec::new(),
+    };
+    
+    for i in 0..device_count {
+        if let Ok(device) = nvml.device_by_index(i) {
+            let memory_info = device.memory_info().ok();
+            let utilization = device.utilization_rates().ok();
+            
+            let gpu = GpuMetrics {
+                index: i,
+                name: device.name().unwrap_or_else(|_| "Unknown".to_string()),
+                brand: "NVIDIA".to_string(),
+                driver_version: nvml.sys_driver_version().unwrap_or_else(|_| "Unknown".to_string()),
+                memory_total_bytes: memory_info.as_ref().map(|m| m.total).unwrap_or(0),
+                memory_used_bytes: memory_info.as_ref().map(|m| m.used).unwrap_or(0),
+                memory_free_bytes: memory_info.as_ref().map(|m| m.free).unwrap_or(0),
+                utilization_gpu_pct: utilization.as_ref().map(|u| u.gpu as f32).unwrap_or(0.0),
+                utilization_memory_pct: utilization.as_ref().map(|u| u.memory as f32).unwrap_or(0.0),
+                temperature_celsius: device.temperature(
+                    nvml_wrapper::enum_wrappers::device::TemperatureSensor::Gpu
+                ).unwrap_or(0) as f32,
+                power_usage_watts: device.power_usage().map(|p| p as f32 / 1000.0).unwrap_or(0.0),
+                power_limit_watts: device.power_management_limit().map(|p| p as f32 / 1000.0).unwrap_or(0.0),
+                fan_speed_pct: device.fan_speed(0).ok(),
+            };
+            results.push(gpu);
+        }
+    }
+    
+    results
+}
+
+/// Returns network connections (TCP and UDP) - simplified implementation
+pub fn get_network_connections() -> Vec<NetworkConnection> {
+    // Note: sysinfo 0.32 removed direct TCP/UDP socket access
+    // This returns an empty list for now
+    // A proper implementation would use platform-specific APIs
+    // (e.g., /proc/net/tcp on Linux, netstat on Windows)
+    Vec::new()
+}
+
+/// Returns CPU core temperatures (per-core temperature readings)
+pub fn get_cpu_core_temperatures() -> Vec<CpuCoreTemperature> {
+    let components_rwlock = get_components_obj();
+    {
+        let mut components = components_rwlock.write().unwrap_or_else(|e| e.into_inner());
+        components.refresh_list();
+        components.refresh();
+    }
+    
+    let components = components_rwlock.read().unwrap_or_else(|e| e.into_inner());
+    let mut core_temps = Vec::new();
+    
+    // Filter components that are CPU cores (typically labeled as "Core 0", "Core 1", etc.)
+    for (index, component) in components.iter().enumerate() {
+        let label = component.label();
+        
+        // Check if this is a CPU core temperature sensor
+        if label.to_lowercase().contains("core") 
+            || label.to_lowercase().contains("cpu") 
+            || label.to_lowercase().contains("package") {
+            
+            core_temps.push(CpuCoreTemperature {
+                core_index: index as u32,
+                temperature_celsius: component.temperature(),
+                max_temperature_celsius: Some(component.max()),
+                critical_temperature_celsius: component.critical(),
+            });
+        }
+    }
+    
+    // If no specific core temps found, return all temperature components
+    if core_temps.is_empty() {
+        for (index, component) in components.iter().enumerate() {
+            core_temps.push(CpuCoreTemperature {
+                core_index: index as u32,
+                temperature_celsius: component.temperature(),
+                max_temperature_celsius: Some(component.max()),
+                critical_temperature_celsius: component.critical(),
+            });
+        }
+    }
+    
+    core_temps
 }
 
 #[cfg(test)]
@@ -514,5 +614,30 @@ mod tests {
         let cpus = get_cpus();
         assert!(!cpus.is_empty());
         println!("CPU refresh test passed with {} cores", cpus.len());
+    }
+
+    #[test]
+    fn test_gpus() {
+        let gpus = get_gpus();
+        println!("Found {} GPUs", gpus.len());
+        for gpu in &gpus {
+            println!(
+                "GPU {}: {} - Utilization: {}%, Temp: {}°C",
+                gpu.index, gpu.name, gpu.utilization_gpu_pct, gpu.temperature_celsius
+            );
+        }
+    }
+
+    #[test]
+    fn test_cpu_core_temperatures() {
+        let temps = get_cpu_core_temperatures();
+        println!("Found {} temperature sensors", temps.len());
+        for temp in &temps {
+            println!(
+                "Core {}: {}°C (Max: {:?}°C, Critical: {:?}°C)",
+                temp.core_index, temp.temperature_celsius, 
+                temp.max_temperature_celsius, temp.critical_temperature_celsius
+            );
+        }
     }
 }

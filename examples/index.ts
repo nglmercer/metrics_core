@@ -44,7 +44,10 @@ import { SystemMonitor } from "./bun/index.js";
 
 async function main() {
   const monitor = new SystemMonitor();
-  await monitor.start();
+  //get all metrics
+  const allMetrics = monitor.getAllMetrics();
+  console.log(allMetrics);
+  //await monitor.start();
 }
 
 main();
