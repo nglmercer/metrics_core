@@ -1,5 +1,12 @@
 use serde::Serialize;
 
+/// Library version info
+#[derive(Serialize, Clone)]
+pub struct LibraryVersion {
+    pub version: String,
+    pub name: String,
+}
+
 #[derive(Serialize)]
 pub struct LoadAverage {
     pub one_min: f64,
@@ -43,7 +50,7 @@ pub struct NetworkMetrics {
     pub packets_transmitted: u64,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 pub struct OsInfo {
     pub name: String,
     pub kernel_version: String,
@@ -69,6 +76,21 @@ pub struct ProcessMetrics {
     pub disk_written_bytes: u64,
     pub status: String,
     pub user_id: Option<String>,
+}
+
+#[derive(Serialize)]
+pub struct ExtendedProcessMetrics {
+    pub pid: u32,
+    pub parent_pid: Option<u32>,
+    pub name: String,
+    pub command: Option<String>,
+    pub cpu_usage: f32,
+    pub memory_bytes: u64,
+    pub disk_read_bytes: u64,
+    pub disk_written_bytes: u64,
+    pub status: String,
+    pub user_id: Option<String>,
+    pub start_time: u64,
 }
 
 #[derive(Serialize)]
@@ -98,6 +120,7 @@ pub struct BatteryInfo {
     pub energy_wh: f32,
 }
 
+/// Complete system metrics snapshot
 #[derive(Serialize)]
 pub struct AllMetrics {
     pub cpu: Vec<CpuMetrics>,
@@ -107,4 +130,15 @@ pub struct AllMetrics {
     pub uptime: u64,
     pub os_info: OsInfo,
     pub load_avg: LoadAverage,
+    pub batteries: Vec<BatteryInfo>,
+    pub components: Vec<ComponentMetrics>,
 }
+
+/// Refresh flags for selective metric updates
+pub const REFRESH_CPU: u32 = 1;
+pub const REFRESH_MEMORY: u32 = 2;
+pub const REFRESH_DISKS: u32 = 4;
+pub const REFRESH_NETWORKS: u32 = 8;
+pub const REFRESH_PROCESSES: u32 = 16;
+pub const REFRESH_COMPONENTS: u32 = 32;
+pub const REFRESH_ALL: u32 = 0xFFFFFFFF;

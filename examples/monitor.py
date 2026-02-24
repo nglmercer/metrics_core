@@ -21,10 +21,20 @@ except OSError:
     sys.exit(1)
 
 # Define return types for FFI functions
-lib.get_all_metrics.restype = ctypes.c_char_p
-lib.get_battery_info.restype = ctypes.c_char_p
-lib.get_library_version.restype = ctypes.c_char_p
-lib.free_metrics_string.argtypes = [ctypes.c_char_p]
+# We use c_void_p for strings we need to free, and explicitly convert them
+lib.get_all_metrics.restype = ctypes.c_void_p
+lib.get_battery_info.restype = ctypes.c_void_p
+lib.get_library_version.restype = ctypes.c_void_p
+lib.get_uptime.restype = ctypes.c_uint64
+
+lib.free_metrics_string.argtypes = [ctypes.c_void_p]
+
+def get_json_from_ptr(ptr):
+    if not ptr:
+        return None
+    res = ctypes.string_at(ptr).decode('utf-8')
+    lib.free_metrics_string(ptr)
+    return json.loads(res)
 
 # --- UI Helpers ---
 def format_bytes(b):
@@ -49,23 +59,19 @@ class Colors:
 
 # --- Main Application Loop ---
 try:
-    version_raw = lib.get_library_version()
-    version = json.loads(version_raw.decode())['version']
-    lib.free_metrics_string(version_raw)
+    version_data = get_json_from_ptr(lib.get_library_version())
+    version = version_data['version'] if version_data else "unknown"
 
     while True:
         clear()
         print(f"{Colors.CYAN}=== SYSTEM MONITOR PRO v{version} (PYTHON FFI) ==={Colors.RESET}")
         
-        raw_ptr = lib.get_all_metrics()
-        if not raw_ptr:
+        data = get_json_from_ptr(lib.get_all_metrics())
+        if not data:
             print("Error: Could not fetch metrics")
             time.sleep(2)
             continue
             
-        data = json.loads(raw_ptr.decode())
-        lib.free_metrics_string(raw_ptr)
-
         uptime = data['uptime']
         hours, rem = divmod(uptime, 3600)
         minutes, seconds = divmod(rem, 60)
@@ -94,15 +100,12 @@ try:
         print(f"  {format_bytes(mem['used_bytes'])} / {format_bytes(mem['total_bytes'])}\n")
 
         # Battery
-        bat_raw = lib.get_battery_info()
-        if bat_raw:
-            batteries = json.loads(bat_raw.decode())
-            lib.free_metrics_string(bat_raw)
-            if batteries:
-                print(f"{Colors.BOLD}Battery Status:{Colors.RESET}")
-                for b in batteries:
-                    print(f"  {b['state']}: {b['energy_pct']:.1f}% (Health: {b['health_pct']:.1f}%)")
-                print()
+        batteries = get_json_from_ptr(lib.get_battery_info())
+        if batteries:
+            print(f"{Colors.BOLD}Battery Status:{Colors.RESET}")
+            for b in batteries:
+                print(f"  {b['state']}: {b['energy_pct']:.1f}% (Health: {b['health_pct']:.1f}%)")
+            print()
 
         # Storage
         print(f"{Colors.BOLD}Storage Devices:{Colors.RESET}")

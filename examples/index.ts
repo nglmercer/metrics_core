@@ -76,6 +76,7 @@ try {
   });
 } catch (e) {
   console.error(`\x1b[31mFailed to load library at ${libPath}\x1b[0m`);
+  console.error(e);
   console.error(`Make sure to run 'cargo build --release' first.`);
   process.exit(1);
 }

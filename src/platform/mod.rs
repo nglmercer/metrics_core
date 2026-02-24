@@ -59,6 +59,11 @@ pub fn get_processes() -> Vec<ProcessMetrics> {
 }
 
 #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
+pub fn get_extended_processes() -> Vec<ExtendedProcessMetrics> {
+    Vec::new()
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
 pub fn get_process_by_pid(_pid: u32) -> Option<ProcessMetrics> {
     None
 }
@@ -105,8 +110,13 @@ pub fn get_all_metrics() -> AllMetrics {
         uptime: 0,
         os_info: get_os_info(),
         load_avg: get_load_average(),
+        batteries: Vec::new(),
+        components: Vec::new(),
     }
 }
+
+#[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
+pub fn refresh_metrics(_flags: u32) {}
 
 #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
 pub fn cleanup_metrics() {}

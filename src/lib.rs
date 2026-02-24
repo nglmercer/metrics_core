@@ -27,6 +27,15 @@ fn to_c_string<T: Serialize>(data: &T) -> *mut c_char {
     }
 }
 
+/// Returns a JSON string containing the library version.
+#[no_mangle]
+pub extern "C" fn get_library_version() -> *mut c_char {
+    to_c_string(&types::LibraryVersion {
+        version: env!("CARGO_PKG_VERSION").to_string(),
+        name: "METRICS".to_string(),
+    })
+}
+
 /// Returns a JSON string containing CPU metrics.
 #[no_mangle]
 pub extern "C" fn get_cpu_metrics() -> *mut c_char {
@@ -81,6 +90,12 @@ pub extern "C" fn get_processes() -> *mut c_char {
     to_c_string(&platform::get_processes())
 }
 
+/// Returns a JSON string containing extended process metrics with parent PID and command line.
+#[no_mangle]
+pub extern "C" fn get_extended_processes() -> *mut c_char {
+    to_c_string(&platform::get_extended_processes())
+}
+
 /// Returns a JSON string containing information for a specific PID.
 /// Returns null if not found.
 #[no_mangle]
@@ -115,8 +130,22 @@ pub extern "C" fn get_all_metrics() -> *mut c_char {
     to_c_string(&platform::get_all_metrics())
 }
 
+/// Refreshes internal metric caches based on the provided flags.
+/// 
+/// Flags:
+/// - 1 (REFRESH_CPU): Refresh CPU metrics
+/// - 2 (REFRESH_MEMORY): Refresh memory metrics
+/// - 4 (REFRESH_DISKS): Refresh disk metrics
+/// - 8 (REFRESH_NETWORKS): Refresh network metrics
+/// - 16 (REFRESH_PROCESSES): Refresh process list
+/// - 32 (REFRESH_COMPONENTS): Refresh component (temperature) data
+/// - 0xFFFFFFFF (REFRESH_ALL): Refresh all metrics
+#[no_mangle]
+pub extern "C" fn refresh_metrics(flags: u32) {
+    platform::refresh_metrics(flags)
+}
+
 /// Cleans up internal resources.
-/// Note: Currently a placeholder as OnceLock cannot be cleared in stable Rust.
 #[no_mangle]
 pub extern "C" fn cleanup_metrics() {
     platform::cleanup_metrics()
